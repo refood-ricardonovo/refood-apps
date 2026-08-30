@@ -1,0 +1,3 @@
+# Copia para .dev.vars e preenche. Em producao usa: wrangler secret put ODOO_USERNAME
+ODOO_USERNAME=""
+ODOO_PASSWORD=""
