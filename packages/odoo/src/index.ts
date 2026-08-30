@@ -4,6 +4,7 @@ import type { OdooConfig } from './types';
 export { OdooClient } from './client';
 export { OdooError, OdooAuthError, OdooTransportError, OdooValidationError, faultToError } from './errors';
 export type { OdooFault, OdooErrorOptions } from './errors';
+export { many2one, many2oneId, nullable, odooDate, toOdooDate } from './normalize';
 export type {
 	JsonRpcResponse,
 	OdooConfig,
@@ -12,6 +13,7 @@ export type {
 	OdooDomainCondition,
 	OdooDomainOperator,
 	OdooMany2One,
+	OdooReadGroupOptions,
 	OdooRecord,
 	OdooSearchOptions,
 	OdooService,

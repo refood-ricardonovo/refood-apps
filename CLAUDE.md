@@ -13,13 +13,16 @@ npm workspaces monorepo: deployable apps in `apps/*`, shared libraries in `packa
 
 ```bash
 npm install                              # from the root; links workspaces
-npm run typecheck --workspace=tv         # tsc --noEmit (also: --workspace=@refood/odoo)
+npm test                                 # all workspaces (Vitest, in packages/odoo)
+npm run typecheck                        # all workspaces
+npm test --workspace=@refood/odoo        # one workspace; add -- -t 'nome' to filter
+npm run test:watch --workspace=@refood/odoo
 npm run dev      --workspace=tv          # wrangler dev
 npm run deploy   --workspace=tv          # wrangler deploy
 npm run cf-typegen --workspace=tv        # wrangler types — regenerates worker-configuration.d.ts
 ```
 
-No test runner and no linter are configured. Prettier config (root `.prettierrc`: tabs, single quotes, semicolons, 140 print width) has no script — run `npx prettier --write <path>` directly.
+Tests are Vitest, and live in `packages/odoo/test/`; there is no linter. Prettier config (root `.prettierrc`: tabs, single quotes, semicolons, 140 print width) has no script — run `npx prettier --write <path>` directly.
 
 ## Architecture
 
@@ -33,8 +36,15 @@ Key facts about the protocol that the code encodes, and that any change must pre
 - `common.authenticate` returns `false` — not an error — when credentials are wrong. That is converted to `OdooAuthError`.
 - The protocol is stateless: every `object.execute_kw` resends db + uid + password. The client caches the `uid` promise per instance (so concurrent first calls authenticate once) and retries a call once after re-authenticating if a cached uid stopped working — but only when the fresh uid actually differs, since an identical uid means a permissions problem that a retry would only repeat.
 - The client's `context` is merged under any per-call `context`, so a call can override `lang`/`tz` without losing the defaults.
+- There is deliberately **no `unlink` shortcut**: the apps do not delete Odoo records, and a public method would be easy to wire to a route by accident. `call(model, 'unlink', [ids])` still works, so the omission forces a decision rather than blocking one. A test asserts it stays off the prototype — do not "restore" it.
 
 `createOdooClient(env)` builds a client from the Worker `Env` and throws naming any missing variable. Create one per request — `Env` only exists inside `fetch`, and construction is free since authentication is lazy.
+
+`src/normalize.ts` holds the pure conversions between Odoo's serialization and idiomatic JS, and exists so those two conventions don't leak into business code:
+
+- Odoo uses `false` — never `null` — for "no value" in **any** field type. Hence `nullable`, `many2one`, `many2oneId`. Do not use `nullable` on a boolean field, where `false` is a real value.
+- Odoo serializes datetimes as `'2026-08-29 09:14:22'` and dates as `'2026-08-29'`, both **always UTC and with no timezone marker**. `odooDate` parses them with an explicit regex rather than `new Date(...)`, because JS engines read that space-separated format as *local* time — which would silently shift every timestamp by the runtime's offset. Date-only values become midnight UTC. Out-of-range or malformed input returns `null` rather than a rolled-over date.
+- `toOdooDate` is the exact inverse, for writing timestamps back (`check_in`, `check_out`). It formats from UTC components and truncates sub-second precision, so `odooDate(toOdooDate(d))` round-trips to the second.
 
 ### `apps/tv` — Cloudflare Worker
 

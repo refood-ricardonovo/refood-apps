@@ -34,6 +34,20 @@ export interface OdooSearchOptions {
 	context?: OdooContext;
 }
 
+export interface OdooReadGroupOptions {
+	limit?: number;
+	offset?: number;
+	/** Ex.: `'quantidade desc'`. Atenção: o `read_group` usa `orderby`, não `order`. */
+	orderby?: string;
+	/**
+	 * Por omissão o Odoo usa `true`, e nesse modo **só agrupa pelo primeiro `groupby`** —
+	 * os restantes ficam por expandir e a contagem vem em `<primeiro_groupby>_count`.
+	 * Para agrupar por todos os campos de uma vez, passa `false`.
+	 */
+	lazy?: boolean;
+	context?: OdooContext;
+}
+
 export interface OdooConfig {
 	/** URL base da instância, sem `/jsonrpc`. Ex.: `https://odoo.myrefood.pt`. */
 	url: string;

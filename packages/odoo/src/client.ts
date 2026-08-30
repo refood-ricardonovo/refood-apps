@@ -1,5 +1,5 @@
 import { OdooAuthError, OdooTransportError, faultToError } from './errors';
-import type { JsonRpcResponse, OdooConfig, OdooContext, OdooDomain, OdooRecord, OdooSearchOptions, OdooService } from './types';
+import type { JsonRpcResponse, OdooConfig, OdooContext, OdooDomain, OdooReadGroupOptions, OdooRecord, OdooSearchOptions, OdooService } from './types';
 
 const JSONRPC_PATH = '/jsonrpc';
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -13,6 +13,11 @@ let requestId = 0;
  * O protocolo é stateless: cada chamada a `object.execute_kw` reenvia db + uid + password.
  * O `uid` é obtido uma vez via `common.authenticate` e reutilizado enquanto a instância viver
  * (o isolate do Worker), poupando um round-trip por pedido.
+ *
+ * **Não existe atalho para `unlink` — de propósito.** As apps não apagam registos no Odoo, e um
+ * método público seria fácil de ligar a uma rota por acidente. Se algum dia for mesmo preciso,
+ * `call(model, 'unlink', [ids])` continua a funcionar: a omissão é para obrigar a decidir, não
+ * para bloquear.
  */
 export class OdooClient {
 	private readonly endpoint: string;
@@ -177,9 +182,42 @@ export class OdooClient {
 		return this.call<boolean>(model, 'write', [ids, values], searchKwargs(options));
 	}
 
-	/** Apaga registos. */
-	unlink(model: string, ids: readonly number[], options: Pick<OdooSearchOptions, 'context'> = {}): Promise<boolean> {
-		return this.call<boolean>(model, 'unlink', [ids], searchKwargs(options));
+	/**
+	 * Agrega registos com `read_group`.
+	 *
+	 * `fields` leva os agregados na notação do Odoo (`'id:count'`, `'quantidade:sum'`) e `groupby`
+	 * os campos de agrupamento, opcionalmente com granularidade temporal (`'create_date:day'`).
+	 *
+	 * Cada grupo devolvido traz, além dos campos pedidos, as chaves internas do Odoo:
+	 * `__domain` (domínio que isola o grupo, pronto para um drill-down), `__count` com `lazy: false`
+	 * — ou `<primeiro_groupby>_count` com o `lazy: true` que o Odoo assume por omissão — e `__range`
+	 * quando se agrupa por data.
+	 *
+	 * ```ts
+	 * const porLocal = await odoo.readGroup(
+	 * 	'refood.entrega',
+	 * 	[['state', '=', 'done']],
+	 * 	['id:count', 'quantidade:sum'],
+	 * 	['local_id'],
+	 * 	{ orderby: 'quantidade desc', limit: 10, lazy: false },
+	 * );
+	 * ```
+	 */
+	readGroup<T extends OdooRecord = OdooRecord>(
+		model: string,
+		domain: OdooDomain,
+		fields: readonly string[],
+		groupby: readonly string[],
+		options: OdooReadGroupOptions = {},
+	): Promise<T[]> {
+		const kwargs: Record<string, unknown> = {};
+		if (options.limit !== undefined) kwargs.limit = options.limit;
+		if (options.offset !== undefined) kwargs.offset = options.offset;
+		if (options.orderby !== undefined) kwargs.orderby = options.orderby;
+		if (options.lazy !== undefined) kwargs.lazy = options.lazy; // `false` é significativo: não usar truthiness
+		if (options.context) kwargs.context = options.context;
+
+		return this.call<T[]>(model, 'read_group', [domain, fields, groupby], kwargs);
 	}
 
 	/** Metadados dos campos de um modelo — tipos, labels, selecções. */
