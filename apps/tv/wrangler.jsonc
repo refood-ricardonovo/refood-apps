@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "refood-tv",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-25",
+  "assets": {
+    "directory": "./public"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "refood-db",
+      "database_id": "COLA-AQUI-O-ID-DE-PRODUCAO",
+      "preview_database_id": "COLA-AQUI-O-ID-DE-STAGING"
+    }
+  ],
+  "vars": {
+    "ODOO_URL": "https://odoo.myrefood.pt",
+    "ODOO_DB": "nome-da-base-odoo"
+  },
+  "observability": { "enabled": true },
+  "upload_source_maps": true
+}
