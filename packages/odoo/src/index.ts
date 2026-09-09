@@ -7,11 +7,14 @@ export type { OdooFault, OdooErrorOptions } from './errors';
 export { many2one, many2oneId, nullable, odooDate, toOdooDate } from './normalize';
 export type {
 	JsonRpcResponse,
+	OdooCallOptions,
 	OdooConfig,
 	OdooContext,
 	OdooDomain,
 	OdooDomainCondition,
 	OdooDomainOperator,
+	OdooFieldsGetOptions,
+	OdooLangOptions,
 	OdooMany2One,
 	OdooReadGroupOptions,
 	OdooRecord,

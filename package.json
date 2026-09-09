@@ -1,6 +1,7 @@
 {
 	"name": "refood-apps",
 	"private": true,
+	"type": "module",
 	"workspaces": [
 		"apps/*",
 		"packages/*"

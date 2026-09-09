@@ -1,5 +1,17 @@
 import { OdooAuthError, OdooTransportError, faultToError } from './errors';
-import type { JsonRpcResponse, OdooConfig, OdooContext, OdooDomain, OdooReadGroupOptions, OdooRecord, OdooSearchOptions, OdooService } from './types';
+import type {
+	JsonRpcResponse,
+	OdooCallOptions,
+	OdooConfig,
+	OdooContext,
+	OdooDomain,
+	OdooFieldsGetOptions,
+	OdooLangOptions,
+	OdooReadGroupOptions,
+	OdooRecord,
+	OdooSearchOptions,
+	OdooService,
+} from './types';
 
 const JSONRPC_PATH = '/jsonrpc';
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -35,6 +47,13 @@ export class OdooClient {
 		const missing = (['url', 'db', 'username', 'password'] as const).filter((key) => !config[key]);
 		if (missing.length > 0) {
 			throw new TypeError(`OdooClient: configuração incompleta, falta ${missing.join(', ')}`);
+		}
+
+		// A língua é de quem pede e vai por chamada — nunca presa ao cliente, que é partilhado pelo
+		// isolate. Ver `OdooLangOptions`. Rejeitar aqui é o que impede que volte a ser propriedade
+		// do processo por descuido de configuração.
+		if (config.context && 'lang' in config.context) {
+			throw new TypeError('OdooClient: `lang` não vai na configuração — é parâmetro de cada leitura. Ver OdooLangOptions.');
 		}
 
 		this.endpoint = `${config.url.replace(/\/+$/, '')}${JSONRPC_PATH}`;
@@ -143,17 +162,17 @@ export class OdooClient {
 	}
 
 	/** Ids que correspondem ao domínio. */
-	search(model: string, domain: OdooDomain = [], options: Omit<OdooSearchOptions, 'fields'> = {}): Promise<number[]> {
+	search(model: string, domain: OdooDomain, options: Omit<OdooSearchOptions, 'fields'>): Promise<number[]> {
 		return this.call<number[]>(model, 'search', [domain], searchKwargs(options));
 	}
 
 	/** Registos que correspondem ao domínio, numa só chamada. */
-	searchRead<T extends OdooRecord = OdooRecord>(model: string, domain: OdooDomain = [], options: OdooSearchOptions = {}): Promise<T[]> {
+	searchRead<T extends OdooRecord = OdooRecord>(model: string, domain: OdooDomain, options: OdooSearchOptions): Promise<T[]> {
 		return this.call<T[]>(model, 'search_read', [domain], searchKwargs(options));
 	}
 
 	/** Número de registos que correspondem ao domínio. */
-	searchCount(model: string, domain: OdooDomain = [], options: Pick<OdooSearchOptions, 'context'> = {}): Promise<number> {
+	searchCount(model: string, domain: OdooDomain, options: OdooCallOptions): Promise<number> {
 		return this.call<number>(model, 'search_count', [domain], searchKwargs(options));
 	}
 
@@ -161,24 +180,19 @@ export class OdooClient {
 	read<T extends OdooRecord = OdooRecord>(
 		model: string,
 		ids: readonly number[],
-		fields: readonly string[] = [],
-		options: Pick<OdooSearchOptions, 'context'> = {},
+		fields: readonly string[],
+		options: OdooCallOptions,
 	): Promise<T[]> {
 		return this.call<T[]>(model, 'read', [ids, fields], searchKwargs(options));
 	}
 
 	/** Cria um registo e devolve o seu id. */
-	create(model: string, values: Record<string, unknown>, options: Pick<OdooSearchOptions, 'context'> = {}): Promise<number> {
+	create(model: string, values: Record<string, unknown>, options: OdooCallOptions): Promise<number> {
 		return this.call<number>(model, 'create', [values], searchKwargs(options));
 	}
 
 	/** Actualiza registos. O Odoo devolve `true` ou levanta excepção. */
-	write(
-		model: string,
-		ids: readonly number[],
-		values: Record<string, unknown>,
-		options: Pick<OdooSearchOptions, 'context'> = {},
-	): Promise<boolean> {
+	write(model: string, ids: readonly number[], values: Record<string, unknown>, options: OdooCallOptions): Promise<boolean> {
 		return this.call<boolean>(model, 'write', [ids, values], searchKwargs(options));
 	}
 
@@ -199,7 +213,7 @@ export class OdooClient {
 	 * 	[['state', '=', 'done']],
 	 * 	['id:count', 'quantidade:sum'],
 	 * 	['local_id'],
-	 * 	{ orderby: 'quantidade desc', limit: 10, lazy: false },
+	 * 	{ lang: 'pt_PT', orderby: 'quantidade desc', limit: 10, lazy: false },
 	 * );
 	 * ```
 	 */
@@ -208,25 +222,44 @@ export class OdooClient {
 		domain: OdooDomain,
 		fields: readonly string[],
 		groupby: readonly string[],
-		options: OdooReadGroupOptions = {},
+		options: OdooReadGroupOptions,
 	): Promise<T[]> {
 		const kwargs: Record<string, unknown> = {};
 		if (options.limit !== undefined) kwargs.limit = options.limit;
 		if (options.offset !== undefined) kwargs.offset = options.offset;
 		if (options.orderby !== undefined) kwargs.orderby = options.orderby;
 		if (options.lazy !== undefined) kwargs.lazy = options.lazy; // `false` é significativo: não usar truthiness
-		if (options.context) kwargs.context = options.context;
+		kwargs.context = contextoDaChamada(options);
 
 		return this.call<T[]>(model, 'read_group', [domain, fields, groupby], kwargs);
 	}
 
-	/** Metadados dos campos de um modelo — tipos, labels, selecções. */
-	fieldsGet(
-		model: string,
-		attributes: readonly string[] = ['string', 'type', 'required', 'selection'],
-	): Promise<Record<string, Record<string, unknown>>> {
-		return this.call(model, 'fields_get', [[], attributes]);
+	/**
+	 * Metadados dos campos de um modelo — tipos, labels, selecções.
+	 *
+	 * Leva `lang` como tudo o resto, e aqui é do que mais se nota: o atributo `string` é a
+	 * **etiqueta traduzida** do campo. Em `en_US` o `company_id` da `res.food.source` chama-se
+	 * *Center*; em `pt_PT` chama-se *Núcleo*, que é o que a operação vê no Odoo.
+	 */
+	fieldsGet(model: string, options: OdooFieldsGetOptions): Promise<Record<string, Record<string, unknown>>> {
+		const atributos = options.attributes ?? ['string', 'type', 'required', 'selection'];
+		return this.call(model, 'fields_get', [[], atributos], { context: contextoDaChamada(options) });
 	}
+}
+
+/**
+ * O contexto que vai na chamada: o que o chamador pediu, mais a língua.
+ *
+ * A língua entra por último e por isso ganha sempre. Um `lang` dentro do `context` seria uma segunda
+ * maneira de dizer a mesma coisa — e duas maneiras é como se perde uma —, por isso é recusado em vez
+ * de ser silenciosamente substituído.
+ */
+function contextoDaChamada(options: OdooLangOptions & { context?: OdooContext }): OdooContext {
+	if (options.context && 'lang' in options.context) {
+		throw new TypeError('OdooClient: `lang` não vai dentro do `context` — é campo próprio das opções da leitura.');
+	}
+
+	return { ...options.context, lang: options.lang };
 }
 
 /** Converte as opções para os kwargs que o execute_kw espera, omitindo o que não foi pedido. */
@@ -236,6 +269,6 @@ function searchKwargs(options: OdooSearchOptions): Record<string, unknown> {
 	if (options.limit !== undefined) kwargs.limit = options.limit;
 	if (options.offset !== undefined) kwargs.offset = options.offset;
 	if (options.order !== undefined) kwargs.order = options.order;
-	if (options.context) kwargs.context = options.context;
+	kwargs.context = contextoDaChamada(options);
 	return kwargs;
 }
