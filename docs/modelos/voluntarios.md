@@ -8,7 +8,7 @@
 > **Levantado em `en_US` — não confiar nos nomes.** O `explorar.ts` corria sem `lang` no contexto,
 > e nesse caso o Odoo **não** usa a língua do utilizador: cai no `en_US`. As etiquetas de campo e os
 > valores de campos traduzidos que aqui aparecem são portanto os ingleses — onde este documento diz
-> *Center*, quem trabalha no Odoo vê *Núcleo*. **A estrutura, os tipos, as relações e as contagens
+> _Center_, quem trabalha no Odoo vê _Núcleo_. **A estrutura, os tipos, as relações e as contagens
 > não são afectados.** O `explorar.ts` passou a ler em `pt_PT` e a imprimir a língua no cabeçalho
 > (`--lingua`); quando este levantamento for repetido, os nomes passam a ser os que as pessoas vêem.
 
@@ -21,7 +21,7 @@ Modelo standard do Odoo (`hr`), e o mais estendido da base: 142 campos, vindos d
 `refood`, `refood_custom_tags` e `refood_survey`.
 
 **Na Refood um `hr.employee` é um voluntário, não um empregado.** A customização assume-o até na
-etiqueta do campo `name`, que é *Volunteer Name*. Toda a estrutura de recursos humanos do Odoo —
+etiqueta do campo `name`, que é _Volunteer Name_. Toda a estrutura de recursos humanos do Odoo —
 salários, subordinados, veículos, picagem de ponto — continua lá por baixo, quase toda por usar.
 
 Em staging (setembro de 2026) são **13 927 registos, dos quais só 5 772 ativos**: mais de metade
@@ -29,14 +29,14 @@ está arquivada e **não aparece nas pesquisas por omissão**.
 
 ### Identidade e nome
 
-| Campo | Tipo | Módulo | Notas |
-|---|---|---|---|
-| `name` | char | `hr`, `refood` | Nome **abreviado**. Não é obrigatório no Odoo |
-| `full_name` | char | `refood` | Nome completo. Vazio em cerca de 430 dos ativos |
-| `display_name` | char | | Calculado, não armazenado — espelha o `name` |
-| `barcode` | char | `hr`, `refood` | **O código único da ficha**; preenchido em praticamente todas |
-| `sequence_prefix` | char | `refood` | País, núcleo e tipo de ficha |
-| `sequence_number` | integer | `refood` | Contador dentro do prefixo |
+| Campo             | Tipo    | Módulo         | Notas                                                         |
+| ----------------- | ------- | -------------- | ------------------------------------------------------------- |
+| `name`            | char    | `hr`, `refood` | Nome **abreviado**. Não é obrigatório no Odoo                 |
+| `full_name`       | char    | `refood`       | Nome completo. Vazio em cerca de 430 dos ativos               |
+| `display_name`    | char    |                | Calculado, não armazenado — espelha o `name`                  |
+| `barcode`         | char    | `hr`, `refood` | **O código único da ficha**; preenchido em praticamente todas |
+| `sequence_prefix` | char    | `refood`       | País, núcleo e tipo de ficha                                  |
+| `sequence_number` | integer | `refood`       | Contador dentro do prefixo                                    |
 
 O `barcode` é o **código único da ficha**, e é a identificação a usar: o `id` do Odoo é interno e o
 nome não é único. Compõe-se do `sequence_prefix` seguido do `sequence_number` a **seis dígitos com
@@ -44,12 +44,12 @@ zeros à esquerda**.
 
 O prefixo tem três partes — `PT`, três letras do núcleo, e `_XX` para o **tipo de ficha**:
 
-| Sufixo | Tipo de ficha |
-|---|---|
-| `_VL` | Voluntários |
-| `_BF` | Beneficiários |
-| `_FA` | Fontes de Alimentos |
-| `_PA` | Parceiros de Apoio |
+| Sufixo | Tipo de ficha       |
+| ------ | ------------------- |
+| `_VL`  | Voluntários         |
+| `_BF`  | Beneficiários       |
+| `_FA`  | Fontes de Alimentos |
+| `_PA`  | Parceiros de Apoio  |
 
 Os outros três tipos vivem noutros módulos, e não em `hr.employee`: aqui só aparecem fichas `_VL`
 (uma única exceção em toda a base ativa). O sufixo é, ainda assim, a razão pela qual não se pode
@@ -66,15 +66,15 @@ curto tem de o derivar, e o `full_name` — quando está preenchido — é a fon
 
 ### Âmbito, estado e datas
 
-| Campo | Tipo | Módulo | Notas |
-|---|---|---|---|
-| `company_id` | many2one → `res.company` | `hr` | O núcleo. **Obrigatório**, ao contrário do que acontece nos turnos |
-| `active` | boolean | `hr` | Arquivamento. **8 155 registos arquivados** em staging |
-| `signup_date` | date | `refood` | Data de inscrição; preenchida em toda a base ativa |
-| `departure_date` / `departure_reason` / `departure_description` | date, selection, text | `hr` | Saída. Praticamente por usar: 22 registos, todos arquivados |
-| `date` | date | `refood` | **Abandonado.** Deixou de ser usado; zero registos preenchidos |
-| `create_date` / `write_date` | datetime | `hr` | Auditoria |
-| `resource_id` | many2one → `resource.resource` | `hr` | **Obrigatório**; o recurso que o Odoo cria com cada ficha |
+| Campo                                                           | Tipo                           | Módulo   | Notas                                                              |
+| --------------------------------------------------------------- | ------------------------------ | -------- | ------------------------------------------------------------------ |
+| `company_id`                                                    | many2one → `res.company`       | `hr`     | O núcleo. **Obrigatório**, ao contrário do que acontece nos turnos |
+| `active`                                                        | boolean                        | `hr`     | Arquivamento. **8 155 registos arquivados** em staging             |
+| `signup_date`                                                   | date                           | `refood` | Data de inscrição; preenchida em toda a base ativa                 |
+| `departure_date` / `departure_reason` / `departure_description` | date, selection, text          | `hr`     | Saída. Praticamente por usar: 22 registos, todos arquivados        |
+| `date`                                                          | date                           | `refood` | **Abandonado.** Deixou de ser usado; zero registos preenchidos     |
+| `create_date` / `write_date`                                    | datetime                       | `hr`     | Auditoria                                                          |
+| `resource_id`                                                   | many2one → `resource.resource` | `hr`     | **Obrigatório**; o recurso que o Odoo cria com cada ficha          |
 
 Arquivar não é o mesmo que registar uma saída: os 8 155 arquivados quase não têm `departure_date`.
 Quem quiser saber se alguém deixou de ser voluntário olha para o `active`, não para as datas de
@@ -85,12 +85,12 @@ saída.
 Os dois vínculos descritos em [`turnos.md`](turnos.md) vivem aqui, e há ainda um campo que se
 parece com eles e não é:
 
-| Campo | Tipo | Módulo | Significado |
-|---|---|---|---|
-| `resource_calendar_ids` | many2many → `resource.calendar` | `refood` | **Inscrição** nos turnos. É o outro lado do `employee_ids` do turno — a mesma relação, vista da ficha |
-| `calendar_availability_ids` | many2many → `res.calendar.availability` | `refood` | **Disponibilidade** declarada no formulário online. Não aponta para o turno, mas para o registo espelho |
-| `shift_ids` | one2many → `res.shift.log` | `refood` | Histórico das inscrições, com datas |
-| `resource_calendar_id` | many2one → `resource.calendar` | `hr` | **Horário de trabalho standard do Odoo — não é um turno.** Aponta para os calendários `Standard 40 hours/week` e não tem significado na operação |
+| Campo                       | Tipo                                    | Módulo   | Significado                                                                                                                                      |
+| --------------------------- | --------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `resource_calendar_ids`     | many2many → `resource.calendar`         | `refood` | **Inscrição** nos turnos. É o outro lado do `employee_ids` do turno — a mesma relação, vista da ficha                                            |
+| `calendar_availability_ids` | many2many → `res.calendar.availability` | `refood` | **Disponibilidade** declarada no formulário online. Não aponta para o turno, mas para o registo espelho                                          |
+| `shift_ids`                 | one2many → `res.shift.log`              | `refood` | Histórico das inscrições, com datas                                                                                                              |
+| `resource_calendar_id`      | many2one → `resource.calendar`          | `hr`     | **Horário de trabalho standard do Odoo — não é um turno.** Aponta para os calendários `Standard 40 hours/week` e não tem significado na operação |
 
 Cerca de 3 960 dos ativos têm pelo menos uma inscrição, 1 880 pelo menos uma disponibilidade
 declarada e 4 100 pelo menos uma linha de histórico.
@@ -103,14 +103,14 @@ quer dizer nada.
 
 A Refood acrescentou campos de contacto **em vez de** usar os do Odoo, e ambos coexistem:
 
-| Campo | Tipo | Módulo | Notas |
-|---|---|---|---|
-| `hr_email` | char | `refood` | O email que a operação usa; preenchido em cerca de 5 365 ativos |
-| `hr_phone` / `hr_mobile` | char | `refood` | Telefone e telemóvel usados |
-| `work_email` / `work_phone` / `mobile_phone` | char | `hr` | Equivalentes standard, quase vazios (uns 386) |
-| `private_email` / `phone` | char | `hr` | Standard, **calculados e não armazenados** — vêm do `address_home_id` |
-| `address_home_id` / `address_id` | many2one → `res.partner` | `hr` | Morada pessoal e morada de trabalho |
-| `emergency_contact` / `emergency_phone` | char | `hr` | Contacto de emergência |
+| Campo                                        | Tipo                     | Módulo   | Notas                                                                 |
+| -------------------------------------------- | ------------------------ | -------- | --------------------------------------------------------------------- |
+| `hr_email`                                   | char                     | `refood` | O email que a operação usa; preenchido em cerca de 5 365 ativos       |
+| `hr_phone` / `hr_mobile`                     | char                     | `refood` | Telefone e telemóvel usados                                           |
+| `work_email` / `work_phone` / `mobile_phone` | char                     | `hr`     | Equivalentes standard, quase vazios (uns 386)                         |
+| `private_email` / `phone`                    | char                     | `hr`     | Standard, **calculados e não armazenados** — vêm do `address_home_id` |
+| `address_home_id` / `address_id`             | many2one → `res.partner` | `hr`     | Morada pessoal e morada de trabalho                                   |
+| `emergency_contact` / `emergency_phone`      | char                     | `hr`     | Contacto de emergência                                                |
 
 Além destes, a ficha guarda **dados pessoais sensíveis** que nenhuma app tem razão para ler:
 `birthday`, `gender`, `marital` e `marital_status_id`, `children`, `spouse_complete_name`,
@@ -129,7 +129,7 @@ Dois destes campos não são acessórios, ao contrário do que o nome standard s
   em 5 389 fichas ativas), mas uma ficha sem ele é uma ficha incompleta.
 - **`mobility_card` é o número da carta de condução** e `fleet_expiration_date` a sua validade,
   apesar de o primeiro vir do módulo de frota do Odoo e o segundo se chamar
-  *M. Card expiration Date*. Não têm nada a ver com cartões de transporte.
+  _M. Card expiration Date_. Não têm nada a ver com cartões de transporte.
 
 ### Consentimentos da inscrição
 
@@ -138,12 +138,12 @@ nenhuma app**: são a prova de que, na inscrição online, o voluntário tomou c
 Nenhuma app tem de os consultar antes de fazer o que quer que seja — não são um interruptor de
 permissões.
 
-| Campo | O que o voluntário declara ou autoriza |
-|---|---|
-| `privacy_policy` | Que lhe foi entregue a Política de Privacidade do núcleo, que leu e compreendeu as condições para integrar o projeto, e que concorda com ela |
-| `rgpd_data_policy` | O tratamento dos seus dados pessoais na qualidade de voluntário, ao abrigo do artigo 13.º do RGPD |
-| `image_policy` | A publicação, nas redes sociais e na comunicação social, de fotografias e imagens das atividades em que participe e onde apareça |
-| `email_policy` | O uso do seu email para a Refood lhe enviar informação sobre as atividades e projetos |
+| Campo                   | O que o voluntário declara ou autoriza                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `privacy_policy`        | Que lhe foi entregue a Política de Privacidade do núcleo, que leu e compreendeu as condições para integrar o projeto, e que concorda com ela    |
+| `rgpd_data_policy`      | O tratamento dos seus dados pessoais na qualidade de voluntário, ao abrigo do artigo 13.º do RGPD                                               |
+| `image_policy`          | A publicação, nas redes sociais e na comunicação social, de fotografias e imagens das atividades em que participe e onde apareça                |
+| `email_policy`          | O uso do seu email para a Refood lhe enviar informação sobre as atividades e projetos                                                           |
 | `rgpd_volunteer_rights` | Que foi informado dos artigos 13.º a 22.º do RGPD — cancelar o consentimento, opor-se ao tratamento, acesso, oposição, retificação e apagamento |
 
 São **booleans**: `false` quer dizer "não assinalou" e é um valor legítimo, não "sem valor" — não
@@ -151,16 +151,16 @@ passar pelo `nullable` do `packages/odoo`.
 
 ### Papéis, equipas e etiquetas
 
-| Campo | Tipo | Módulo | Notas |
-|---|---|---|---|
-| `job_id` | many2one → `hr.job` | `hr` | O papel do voluntário. Preenchido em cerca de 4 960 ativos |
-| `department_id` | many2one → `hr.department` | `hr` | Standard, por usar |
-| `functional_team_ids` | many2many → `res.functional.team` | `refood` | Equipas funcionais; uns 670 ativos |
-| `executive_team_ids` | many2many → `res.executive.team` | `refood` | Equipas executivas; uns 24 ativos |
-| `hr_executive_line_ids` | one2many → `hr.employee.executive.line` | `refood` | Linhas que ligam voluntário a equipa executiva |
-| `category_ids` | many2many → `hr.employee.category` | `hr`, `refood` | Etiquetas standard do Odoo; uns 1 530 ativos |
-| `refood_tag_ids` | many2many → `refood.custom.tags` | `refood_custom_tags` | Etiquetas por empresa; uns 10 ativos |
-| `parent_id` / `coach_id` / `child_ids` | many2one, one2many → `hr.employee` | `hr` | Hierarquia standard, por usar |
+| Campo                                  | Tipo                                    | Módulo               | Notas                                                      |
+| -------------------------------------- | --------------------------------------- | -------------------- | ---------------------------------------------------------- |
+| `job_id`                               | many2one → `hr.job`                     | `hr`                 | O papel do voluntário. Preenchido em cerca de 4 960 ativos |
+| `department_id`                        | many2one → `hr.department`              | `hr`                 | Standard, por usar                                         |
+| `functional_team_ids`                  | many2many → `res.functional.team`       | `refood`             | Equipas funcionais; uns 670 ativos                         |
+| `executive_team_ids`                   | many2many → `res.executive.team`        | `refood`             | Equipas executivas; uns 24 ativos                          |
+| `hr_executive_line_ids`                | one2many → `hr.employee.executive.line` | `refood`             | Linhas que ligam voluntário a equipa executiva             |
+| `category_ids`                         | many2many → `hr.employee.category`      | `hr`, `refood`       | Etiquetas standard do Odoo; uns 1 530 ativos               |
+| `refood_tag_ids`                       | many2many → `refood.custom.tags`        | `refood_custom_tags` | Etiquetas por empresa; uns 10 ativos                       |
+| `parent_id` / `coach_id` / `child_ids` | many2one, one2many → `hr.employee`      | `hr`                 | Hierarquia standard, por usar                              |
 
 Há **dois sistemas de etiquetas** em paralelo, e não são o mesmo: as `category_ids` são as do
 Odoo, globais; as `refood_tag_ids` são da Refood e têm `company_id` obrigatório.
@@ -170,17 +170,17 @@ Odoo, globais; as `refood_tag_ids` são da Refood e têm `company_id` obrigatór
 O `job_id` aponta para `hr.job`, que na base toda tem **três registos**, sem `company_id` — os
 papéis são nacionais, não por núcleo:
 
-| Papel | `is_manager` |
-|---|---|
-| Voluntário | `false` |
-| Voluntário Gestor | `true` |
-| Voluntário Gestor de Turno | `true` |
+| Papel                      | `is_manager` |
+| -------------------------- | ------------ |
+| Voluntário                 | `false`      |
+| Voluntário Gestor          | `true`       |
+| Voluntário Gestor de Turno | `true`       |
 
 O `is_manager` é o que separa os dois níveis, e é ele que decide duas coisas:
 
 - **Quem pode ser gestor de um turno.** Os dois papéis com `is_manager` são os que aparecem na
   lista de escolha do `shift_manager_id` do turno (ver [`turnos.md`](turnos.md)).
-- **A quem se pode atribuir uma equipa.** Só o *Voluntário Gestor* — o gestor que não é de turno —
+- **A quem se pode atribuir uma equipa.** Só o _Voluntário Gestor_ — o gestor que não é de turno —
   é que recebe equipas funcionais ou executivas.
 
 #### As duas equipas
@@ -196,16 +196,16 @@ vêem-se em `functional_team_ids` e `executive_team_ids`.
 
 ### Sócio, veículos, carta de condução e observações
 
-| Campo | Tipo | Módulo | Significado |
-|---|---|---|---|
-| `has_membership` | boolean | `refood` | **O voluntário é sócio da associação.** É para isso que serve, mas a gestão de sócios ainda não está a ser feita por aqui: `true` em um único registo de toda a base |
-| `own_vehicle` | boolean | `refood` | Tem veículo próprio, para o caso de ser preciso usá-lo. 1 430 ativos |
-| `refood_vehicle` | boolean | `refood` | Está disponível para conduzir o carro do núcleo. 1 159 ativos |
-| `mobility_card` | char | `hr_fleet` | **Número da carta de condução.** 2 165 ativos |
-| `fleet_expiration_date` | date | `refood` | Validade da carta de condução |
-| `employee_notes` | char | `refood` | Observações. 1 533 ativos |
+| Campo                   | Tipo    | Módulo     | Significado                                                                                                                                                          |
+| ----------------------- | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `has_membership`        | boolean | `refood`   | **O voluntário é sócio da associação.** É para isso que serve, mas a gestão de sócios ainda não está a ser feita por aqui: `true` em um único registo de toda a base |
+| `own_vehicle`           | boolean | `refood`   | Tem veículo próprio, para o caso de ser preciso usá-lo. 1 430 ativos                                                                                                 |
+| `refood_vehicle`        | boolean | `refood`   | Está disponível para conduzir o carro do núcleo. 1 159 ativos                                                                                                        |
+| `mobility_card`         | char    | `hr_fleet` | **Número da carta de condução.** 2 165 ativos                                                                                                                        |
+| `fleet_expiration_date` | date    | `refood`   | Validade da carta de condução                                                                                                                                        |
+| `employee_notes`        | char    | `refood`   | Observações. 1 533 ativos                                                                                                                                            |
 
-Os dois campos de veículo respondem a perguntas diferentes — *tem carro* e *conduz o do núcleo* — e
+Os dois campos de veículo respondem a perguntas diferentes — _tem carro_ e _conduz o do núcleo_ — e
 não se substituem um ao outro.
 
 O `employee_notes` é o campo de observações que está a ser usado. Os dois standard do Odoo com a
@@ -249,14 +249,14 @@ ter sido duplicado por engano, quando o campo pareceu estar em falta.
 Modelo da Refood, alcançado por `shift_ids`. Uma linha por cada vez que um voluntário entrou num
 turno, com as datas. 10 655 registos em staging.
 
-| Campo | Tipo | Relação | Notas |
-|---|---|---|---|
-| `employee_id` | many2one | `hr.employee` | O voluntário |
-| `resource_calendar_id` | many2one | `resource.calendar` | O turno |
-| `start_date` | date | | Data em que começou a fazer aquele turno |
-| `end_date` | date | | Data em que **deixou de fazer aquele turno**; vazio enquanto o faz |
-| `name` | char | | Vazio em toda a amostra |
-| `create_uid` / `write_uid` / `create_date` / `write_date` | | | Auditoria |
+| Campo                                                     | Tipo     | Relação             | Notas                                                              |
+| --------------------------------------------------------- | -------- | ------------------- | ------------------------------------------------------------------ |
+| `employee_id`                                             | many2one | `hr.employee`       | O voluntário                                                       |
+| `resource_calendar_id`                                    | many2one | `resource.calendar` | O turno                                                            |
+| `start_date`                                              | date     |                     | Data em que começou a fazer aquele turno                           |
+| `end_date`                                                | date     |                     | Data em que **deixou de fazer aquele turno**; vazio enquanto o faz |
+| `name`                                                    | char     |                     | Vazio em toda a amostra                                            |
+| `create_uid` / `write_uid` / `create_date` / `write_date` |          |                     | Auditoria                                                          |
 
 **O `end_date` é por turno, não pela pessoa.** Um voluntário com `end_date` preenchido numa linha
 pode continuar noutros turnos, e pode continuar voluntário sem ter turno nenhum atribuído. Quem
@@ -289,15 +289,15 @@ Doze campos, **todos do módulo `hr_attendance`**. Zero customização da Refood
 `hr.employee` ao lado, que tem 142 campos vindos de dez módulos, diz sozinho que ninguém pegou
 nisto para o adaptar à operação.
 
-| Campo | Tipo | Obr. | Armazenado | Notas |
-|---|---|---|---|---|
-| `employee_id` | many2one → `hr.employee` | **sim** | sim | O voluntário. É por aqui que se chega ao núcleo |
-| `check_in` | datetime | **sim** | sim | Entrada |
-| `check_out` | datetime | | sim | Saída. Vazio enquanto a sessão está aberta |
-| `worked_hours` | float | | **sim** | Calculado do par, mas armazenado — entra em domínio e em `order` |
-| `department_id` | many2one → `hr.department` | | **não** | Relacionado, não armazenado: ler, sim; filtrar ou ordenar, não |
-| `display_name`, `__last_update` | | | não | Calculados |
-| `create_uid` / `write_uid` / `create_date` / `write_date` | | | sim | Auditoria |
+| Campo                                                     | Tipo                       | Obr.    | Armazenado | Notas                                                            |
+| --------------------------------------------------------- | -------------------------- | ------- | ---------- | ---------------------------------------------------------------- |
+| `employee_id`                                             | many2one → `hr.employee`   | **sim** | sim        | O voluntário. É por aqui que se chega ao núcleo                  |
+| `check_in`                                                | datetime                   | **sim** | sim        | Entrada                                                          |
+| `check_out`                                               | datetime                   |         | sim        | Saída. Vazio enquanto a sessão está aberta                       |
+| `worked_hours`                                            | float                      |         | **sim**    | Calculado do par, mas armazenado — entra em domínio e em `order` |
+| `department_id`                                           | many2one → `hr.department` |         | **não**    | Relacionado, não armazenado: ler, sim; filtrar ou ordenar, não   |
+| `display_name`, `__last_update`                           |                            |         | não        | Calculados                                                       |
+| `create_uid` / `write_uid` / `create_date` / `write_date` |                            |         | sim        | Auditoria                                                        |
 
 **Não tem `company_id`** — a mesma armadilha do `res.shift.log`. O âmbito por núcleo só pode vir do
 `employee_id`, e nada na base garante coerência entre os dois.
@@ -321,15 +321,15 @@ adotou — gente a experimentar, em sítios e alturas diferentes:
 
 Só 417 das 824 linhas caem entre as 2 e as 4 horas, que é a duração plausível de um turno. O resto:
 
-| `worked_hours` | Linhas |
-|---|---|
-| 0 | 56 |
-| < 2 h | 331 |
-| 2 – 4 h | 417 |
-| 4 – 8 h | 1 |
-| 8 – 24 h | 3 |
-| 24 h – 1 semana | 6 |
-| > 1 semana | 10 |
+| `worked_hours`  | Linhas |
+| --------------- | ------ |
+| 0               | 56     |
+| < 2 h           | 331    |
+| 2 – 4 h         | 417    |
+| 4 – 8 h         | 1      |
+| 8 – 24 h        | 3      |
+| 24 h – 1 semana | 6      |
+| > 1 semana      | 10     |
 
 **52 linhas nunca tiveram `check_out`** — sessões abertas, algumas há anos, e são essas que dão a
 maioria dos zeros. E as dez acima de uma semana carregam sozinhas quase todo o total de 23 604

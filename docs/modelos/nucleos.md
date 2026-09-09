@@ -5,7 +5,7 @@
 > **Levantado em `en_US` — não confiar nos nomes.** O `explorar.ts` corria sem `lang` no contexto,
 > e nesse caso o Odoo **não** usa a língua do utilizador: cai no `en_US`. As etiquetas de campo e os
 > valores de campos traduzidos que aqui aparecem são portanto os ingleses — onde este documento diz
-> *Center*, quem trabalha no Odoo vê *Núcleo*. **A estrutura, os tipos, as relações e as contagens
+> _Center_, quem trabalha no Odoo vê _Núcleo_. **A estrutura, os tipos, as relações e as contagens
 > não são afectados.** O `explorar.ts` passou a ler em `pt_PT` e a imprimir a língua no cabeçalho
 > (`--lingua`); quando este levantamento for repetido, os nomes passam a ser os que as pessoas vêem.
 
@@ -24,29 +24,29 @@ e é por ele que passa a separação entre núcleos em toda a base. Em staging (
 
 ### Campos que interessam (standard)
 
-| Campo | Tipo | Relação | Notas |
-|---|---|---|---|
-| `id` | integer | | Interno. A identificação legível do núcleo é o `center_prefix` |
-| `name` | char | | **Obrigatório** |
-| `partner_id` | many2one | `res.partner` | **Obrigatório**; o contacto onde vive a morada e a identificação fiscal |
-| `parent_id` | many2one | `res.company` | Empresa-mãe. **Não separa núcleo de nacional** — ver abaixo |
-| `child_ids` | one2many | `res.company` | O inverso |
-| `currency_id` | many2one | `res.currency` | **Obrigatório**; EUR nas 87 |
-| `sequence` | integer | | Ordenação na lista de empresas |
-| `resource_calendar_ids` | one2many | `resource.calendar` | Os turnos do núcleo (ver [`turnos.md`](turnos.md)) |
-| `resource_calendar_id` | many2one | `resource.calendar` | *Default Working Hours* do Odoo. Preenchido nas 87, mas é o horário por omissão de RH, não um turno |
-| `user_ids` | many2many | `res.users` | Utilizadores com acesso à empresa |
-| `email` / `phone` | char | | Vindos do `partner_id`, mas **armazenados** — dá para filtrar e ordenar |
-| `primary_color` / `secondary_color` | char | | Cor da empresa nos relatórios. Preenchidos em **2 das 87** — não servem para distinguir núcleos |
-| `create_uid` / `write_uid` / `create_date` / `write_date` | | | Auditoria |
-| `display_name` | char | | Calculado, não armazenado |
+| Campo                                                     | Tipo      | Relação             | Notas                                                                                               |
+| --------------------------------------------------------- | --------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `id`                                                      | integer   |                     | Interno. A identificação legível do núcleo é o `center_prefix`                                      |
+| `name`                                                    | char      |                     | **Obrigatório**                                                                                     |
+| `partner_id`                                              | many2one  | `res.partner`       | **Obrigatório**; o contacto onde vive a morada e a identificação fiscal                             |
+| `parent_id`                                               | many2one  | `res.company`       | Empresa-mãe. **Não separa núcleo de nacional** — ver abaixo                                         |
+| `child_ids`                                               | one2many  | `res.company`       | O inverso                                                                                           |
+| `currency_id`                                             | many2one  | `res.currency`      | **Obrigatório**; EUR nas 87                                                                         |
+| `sequence`                                                | integer   |                     | Ordenação na lista de empresas                                                                      |
+| `resource_calendar_ids`                                   | one2many  | `resource.calendar` | Os turnos do núcleo (ver [`turnos.md`](turnos.md))                                                  |
+| `resource_calendar_id`                                    | many2one  | `resource.calendar` | _Default Working Hours_ do Odoo. Preenchido nas 87, mas é o horário por omissão de RH, não um turno |
+| `user_ids`                                                | many2many | `res.users`         | Utilizadores com acesso à empresa                                                                   |
+| `email` / `phone`                                         | char      |                     | Vindos do `partner_id`, mas **armazenados** — dá para filtrar e ordenar                             |
+| `primary_color` / `secondary_color`                       | char      |                     | Cor da empresa nos relatórios. Preenchidos em **2 das 87** — não servem para distinguir núcleos     |
+| `create_uid` / `write_uid` / `create_date` / `write_date` |           |                     | Auditoria                                                                                           |
+| `display_name`                                            | char      |                     | Calculado, não armazenado                                                                           |
 
 ### Campos acrescentados pelos módulos `refood`
 
-| Campo | Tipo | Módulo | Significado |
-|---|---|---|---|
-| `center_prefix` | char | `refood` | As três letras do núcleo, que entram na numeração das fichas |
-| `pos_validation_code` | integer | `refood_pos` | Código para ações especiais no POS. **Não é usado** |
+| Campo                 | Tipo    | Módulo       | Significado                                                  |
+| --------------------- | ------- | ------------ | ------------------------------------------------------------ |
+| `center_prefix`       | char    | `refood`     | As três letras do núcleo, que entram na numeração das fichas |
+| `pos_validation_code` | integer | `refood_pos` | Código para ações especiais no POS. **Não é usado**          |
 
 **`center_prefix` é a identificação do núcleo.** É a peça do meio no código único de todas as
 fichas da operação — voluntários, beneficiários, fontes de alimento e parceiros de apoio —, que se

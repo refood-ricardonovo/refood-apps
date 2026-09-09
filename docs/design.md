@@ -2,7 +2,7 @@
 
 Duas origens, e a diferença importa em cada linha deste documento:
 
-- **Fixo** — vem do *Guia de Utilização da Marca REFOOD*, maio de 2019. Não se discute nem se
+- **Fixo** — vem do _Guia de Utilização da Marca REFOOD_, maio de 2019. Não se discute nem se
   ajusta sem falar com `nacionalcomunicacao@re-food.org`.
 - **Proposta** — não existe no guia. Foi decidido aqui, para as apps, e pode mudar. Está marcado
   como tal em todas as secções onde aparece.
@@ -13,10 +13,10 @@ Duas origens, e a diferença importa em cada linha deste documento:
 
 ### As duas cores
 
-| | HEX | RGB | Pantone | CMYK |
-|---|---|---|---|---|
-| Amarelo | `#F5B72F` | 245 183 47 | 1235 | 0 / 32 / 100 / 0 |
-| Preto | `#000000` | 0 0 0 | Black 100% | 0 / 0 / 0 / 100 |
+|         | HEX       | RGB        | Pantone    | CMYK             |
+| ------- | --------- | ---------- | ---------- | ---------------- |
+| Amarelo | `#F5B72F` | 245 183 47 | 1235       | 0 / 32 / 100 / 0 |
+| Preto   | `#000000` | 0 0 0      | Black 100% | 0 / 0 / 0 / 100  |
 
 São estas as cores da marca. O guia não define mais nenhuma — nem cinzentos, nem cores de estado.
 
@@ -46,11 +46,11 @@ Existe uma composição oficial da marca para identificar um núcleo, com o nome
 
 ## A regra que decide todo o resto: o amarelo não é cor de texto
 
-| Combinação | Contraste |
-|---|---|
-| `#F5B72F` sobre branco | **1,8 : 1** |
-| `#F5B72F` sobre preto | **11,7 : 1** |
-| Branco sobre `#F5B72F` | 1,8 : 1 |
+| Combinação             | Contraste    |
+| ---------------------- | ------------ |
+| `#F5B72F` sobre branco | **1,8 : 1**  |
+| `#F5B72F` sobre preto  | **11,7 : 1** |
+| Branco sobre `#F5B72F` | 1,8 : 1      |
 
 O mínimo do WCAG AA é 4,5:1 para texto normal e 3:1 para texto grande. O amarelo sobre branco falha
 os dois, em qualquer tamanho. Não é uma questão de gosto nem de tolerância: é ilegível para uma
@@ -69,16 +69,16 @@ Daqui saem três regras de aplicação, **proposta**, mas difíceis de contornar
 
 O guia não tem nenhum. Escala neutra pura, sem tom, para não competir com o amarelo:
 
-| Token | HEX | Uso |
-|---|---|---|
-| `--n-950` | `#0F0F0F` | Fundo da TV |
-| `--n-900` | `#1A1A1A` | Superfície elevada sobre o fundo da TV |
-| `--n-800` | `#2B2B2B` | Divisórias e limites sobre escuro |
-| `--n-600` | `#5A5A5A` | Texto desativado sobre claro |
+| Token     | HEX       | Uso                                                   |
+| --------- | --------- | ----------------------------------------------------- |
+| `--n-950` | `#0F0F0F` | Fundo da TV                                           |
+| `--n-900` | `#1A1A1A` | Superfície elevada sobre o fundo da TV                |
+| `--n-800` | `#2B2B2B` | Divisórias e limites sobre escuro                     |
+| `--n-600` | `#5A5A5A` | Texto desativado sobre claro                          |
 | `--n-400` | `#9A9A9A` | Texto secundário sobre escuro — 6,2:1 sobre `--n-900` |
-| `--n-200` | `#D6D6D6` | Divisórias sobre claro |
-| `--n-100` | `#EDEDED` | Fundo da PWA |
-| `--n-000` | `#FFFFFF` | Superfície da PWA, texto sobre escuro |
+| `--n-200` | `#D6D6D6` | Divisórias sobre claro                                |
+| `--n-100` | `#EDEDED` | Fundo da PWA                                          |
+| `--n-000` | `#FFFFFF` | Superfície da PWA, texto sobre escuro                 |
 
 O preto puro `#000000` fica reservado ao logótipo e a texto sobre amarelo, para que a marca não se
 confunda com o chrome da interface.
@@ -92,11 +92,11 @@ alerta for amarelo, deixa de haver diferença entre "isto é a Refood" e "isto e
 
 Portanto: **nenhum estado usa amarelo**, e há dois estados, não três.
 
-| Estado | Sobre escuro | Sobre claro | Contraste sobre `--n-900` |
-|---|---|---|---|
-| Erro | `#FF7A6E` | `#C5342A` | 6,9 : 1 |
-| Sucesso | `#5CD68A` | `#1E7A44` | 9,5 : 1 |
-| Informação | `#5AA9FF` | `#1A5FB4` | 7,1 : 1 |
+| Estado     | Sobre escuro | Sobre claro | Contraste sobre `--n-900` |
+| ---------- | ------------ | ----------- | ------------------------- |
+| Erro       | `#FF7A6E`    | `#C5342A`   | 6,9 : 1                   |
+| Sucesso    | `#5CD68A`    | `#1E7A44`   | 9,5 : 1                   |
+| Informação | `#5AA9FF`    | `#1A5FB4`   | 7,1 : 1                   |
 
 A cor nunca é o único portador do significado — leva sempre texto ou ícone ao lado. Numa TV, é
 provável que quem olha esteja a três metros e de lado.
@@ -126,12 +126,12 @@ saltam de posição a cada atualização do dashboard.
 
 ### Pesos
 
-| Onde | Peso |
-|---|---|
-| Corrente na PWA | 400 |
-| **Corrente na TV** | **500** |
-| Ênfase | 600 |
-| Números de destaque e nome do núcleo | 700 |
+| Onde                                 | Peso    |
+| ------------------------------------ | ------- |
+| Corrente na PWA                      | 400     |
+| **Corrente na TV**                   | **500** |
+| Ênfase                               | 600     |
+| Números de destaque e nome do núcleo | 700     |
 
 **O 500 na TV não é decoração.** Texto claro sobre fundo escuro parece opticamente mais fino do que
 é — o mesmo peso 400 que assenta na PWA esvai-se num televisor a três metros. A regra vale para
@@ -148,12 +148,12 @@ A conta, para se poder refazer: num televisor de 43" a 1080p, a altura útil sã
 **0,5 mm por pixel**. A regra prática para leitura confortável é a altura do caráter ≈ distância
 ÷ 200. A quatro metros dá 20 mm, e 20 mm são **40 px**.
 
-| | Tamanho | Notas |
-|---|---|---|
-| Números de destaque | 120–200 px | O que se lê de relance |
-| Título | 64 px | |
-| Corrente | 40 px | **Mínimo absoluto** |
-| Secundário | 32 px | Só para etiquetas curtas, nunca para dados |
+|                     | Tamanho    | Notas                                      |
+| ------------------- | ---------- | ------------------------------------------ |
+| Números de destaque | 120–200 px | O que se lê de relance                     |
+| Título              | 64 px      |                                            |
+| Corrente            | 40 px      | **Mínimo absoluto**                        |
+| Secundário          | 32 px      | Só para etiquetas curtas, nunca para dados |
 
 Fundo `--n-950`, texto `--n-000`, amarelo como acento. Nada abaixo de 32 px vai para um televisor.
 
@@ -214,34 +214,44 @@ escrito à mão, divergem em três meses.
 
 ```css
 :root {
-  /* Marca — fixo */
-  --marca-amarelo: #F5B72F;
-  --marca-preto:   #000000;
+	/* Marca — fixo */
+	--marca-amarelo: #f5b72f;
+	--marca-preto: #000000;
 
-  /* Neutros */
-  --n-950: #0F0F0F;
-  --n-900: #1A1A1A;
-  --n-800: #2B2B2B;
-  --n-600: #5A5A5A;
-  --n-400: #9A9A9A;
-  --n-200: #D6D6D6;
-  --n-100: #EDEDED;
-  --n-000: #FFFFFF;
+	/* Neutros */
+	--n-950: #0f0f0f;
+	--n-900: #1a1a1a;
+	--n-800: #2b2b2b;
+	--n-600: #5a5a5a;
+	--n-400: #9a9a9a;
+	--n-200: #d6d6d6;
+	--n-100: #ededed;
+	--n-000: #ffffff;
 
-  /* Estados */
-  --erro-claro:  #FF7A6E;  --erro-escuro:  #C5342A;
-  --ok-claro:    #5CD68A;  --ok-escuro:    #1E7A44;
-  --info-claro:  #5AA9FF;  --info-escuro:  #1A5FB4;
+	/* Estados */
+	--erro-claro: #ff7a6e;
+	--erro-escuro: #c5342a;
+	--ok-claro: #5cd68a;
+	--ok-escuro: #1e7a44;
+	--info-claro: #5aa9ff;
+	--info-escuro: #1a5fb4;
 
-  /* Tipo */
-  --fonte: Inter, Helvetica, Arial, sans-serif;
-  --peso-corrente: 400;      /* 500 sobre fundo escuro */
-  --peso-enfase: 600;
-  --peso-destaque: 700;
+	/* Tipo */
+	--fonte: Inter, Helvetica, Arial, sans-serif;
+	--peso-corrente: 400; /* 500 sobre fundo escuro */
+	--peso-enfase: 600;
+	--peso-destaque: 700;
 
-  /* Espaço */
-  --e-1: 4px;  --e-2: 8px;   --e-3: 12px;  --e-4: 16px;
-  --e-6: 24px; --e-8: 32px;  --e-12: 48px; --e-16: 64px; --e-24: 96px;
+	/* Espaço */
+	--e-1: 4px;
+	--e-2: 8px;
+	--e-3: 12px;
+	--e-4: 16px;
+	--e-6: 24px;
+	--e-8: 32px;
+	--e-12: 48px;
+	--e-16: 64px;
+	--e-24: 96px;
 }
 ```
 

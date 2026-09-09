@@ -5,7 +5,7 @@
 > **Levantado em `en_US` — não confiar nos nomes.** O `explorar.ts` corria sem `lang` no contexto,
 > e nesse caso o Odoo **não** usa a língua do utilizador: cai no `en_US`. As etiquetas de campo e os
 > valores de campos traduzidos que aqui aparecem são portanto os ingleses — onde este documento diz
-> *Center*, quem trabalha no Odoo vê *Núcleo*. **A estrutura, os tipos, as relações e as contagens
+> _Center_, quem trabalha no Odoo vê _Núcleo_. **A estrutura, os tipos, as relações e as contagens
 > não são afectados.** O `explorar.ts` passou a ler em `pt_PT` e a imprimir a língua no cabeçalho
 > (`--lingua`); quando este levantamento for repetido, os nomes passam a ser os que as pessoas vêem.
 

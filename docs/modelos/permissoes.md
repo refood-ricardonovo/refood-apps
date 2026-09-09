@@ -6,7 +6,7 @@ transversais em [`../modelos-odoo.md`](../modelos-odoo.md).
 > **Levantado em `en_US` — não confiar nos nomes.** O `explorar.ts` corria sem `lang` no contexto,
 > e nesse caso o Odoo **não** usa a língua do utilizador: cai no `en_US`. As etiquetas de campo e os
 > valores de campos traduzidos que aqui aparecem são portanto os ingleses — onde este documento diz
-> *Center*, quem trabalha no Odoo vê *Núcleo*. **A estrutura, os tipos, as relações e as contagens
+> _Center_, quem trabalha no Odoo vê _Núcleo_. **A estrutura, os tipos, as relações e as contagens
 > não são afectados.** O `explorar.ts` passou a ler em `pt_PT` e a imprimir a língua no cabeçalho
 > (`--lingua`); quando este levantamento for repetido, os nomes passam a ser os que as pessoas vêem.
 
@@ -31,10 +31,10 @@ beneficiários dos cinco e os voluntários de um só.
 
 É o mecanismo standard do Odoo, sem alterações:
 
-| Campo do `res.users` | O que é |
-|---|---|
-| `company_ids` | **Os núcleos a que tem acesso.** É o limite exterior de tudo |
-| `company_id` | **O núcleo por defeito** — um só, e é sempre um dos `company_ids` |
+| Campo do `res.users` | O que é                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| `company_ids`        | **Os núcleos a que tem acesso.** É o limite exterior de tudo      |
+| `company_id`         | **O núcleo por defeito** — um só, e é sempre um dos `company_ids` |
 
 Dos **453 utilizadores internos**, **420 têm um único núcleo** e 33 têm mais do que um (o máximo é
 87, a base inteira). Ou seja: **para a esmagadora maioria dos voluntários, a distinção
@@ -57,19 +57,19 @@ Cada área da operação é uma `ir.module.category` com **dois grupos: `Manager
 interface, em português, **"Gestor"** e **"Utilizador"**. **Os nomes na base são em inglês**; o que
 se vê no ecrã são traduções.
 
-| Categoria (base) | Na interface | Gestor | Utilizador |
-|---|---|---|---|
-| `Management` | **Sistemas de Gestão** | **8** | — |
-| `Coordination` | Coordenação | 12 | 108 |
-| `Beneficiaries Management` | Gestão de Beneficiários | 35 | 258 |
-| `Volunteers Management` | Gestão de Voluntários | 15 | 230 |
-| `Shift Management` | Gestão de Turnos | 13 | 235 |
-| `Food Source Management` | Gestão de Fontes de Alimentos | 14 | 179 |
-| `Community Support Management` | Gestão de Apoio de Comunidade | 6 | 24 |
-| `Operational Resources Management` | Gestão de Recursos Operacionais | 4 | 20 |
-| `Training & Quality Management` | Gestão de Formação & Qualidade | 6 | 8 |
-| `Communication Management` | Gestão de Comunicação | 1 | 5 |
-| `Financial Management` | Gestão Financeira | 2 | 6 (+1 de validação) |
+| Categoria (base)                   | Na interface                    | Gestor | Utilizador          |
+| ---------------------------------- | ------------------------------- | ------ | ------------------- |
+| `Management`                       | **Sistemas de Gestão**          | **8**  | —                   |
+| `Coordination`                     | Coordenação                     | 12     | 108                 |
+| `Beneficiaries Management`         | Gestão de Beneficiários         | 35     | 258                 |
+| `Volunteers Management`            | Gestão de Voluntários           | 15     | 230                 |
+| `Shift Management`                 | Gestão de Turnos                | 13     | 235                 |
+| `Food Source Management`           | Gestão de Fontes de Alimentos   | 14     | 179                 |
+| `Community Support Management`     | Gestão de Apoio de Comunidade   | 6      | 24                  |
+| `Operational Resources Management` | Gestão de Recursos Operacionais | 4      | 20                  |
+| `Training & Quality Management`    | Gestão de Formação & Qualidade  | 6      | 8                   |
+| `Communication Management`         | Gestão de Comunicação           | 1      | 5                   |
+| `Financial Management`             | Gestão Financeira               | 2      | 6 (+1 de validação) |
 
 **O `Manager` implica sempre o `User` da mesma categoria**: Gestão é Utilizador mais alguma coisa,
 nunca outra coisa. E um utilizador tem **um nível por área** — pode ser Gestor de Beneficiários e
@@ -81,11 +81,11 @@ Utilizador de Voluntários ao mesmo tempo, que é o caso do exemplo mais comum.
 
 Está nas `ir.rule`, e o desenho repete-se modelo a modelo em **três camadas**:
 
-| Camada | Domínio | A quem se aplica |
-|---|---|---|
-| **Regra global** | `company_id in company_ids` | A toda a gente. É o teto: **nunca se vê fora dos núcleos permitidos** |
-| **Regra do Utilizador** | `company_id = user.company_id.id` | Ao `Internal User`, ou seja, a todos |
-| **Regra do Gestor** | `(1, '=', 1)` | Só aos grupos `Manager` da área |
+| Camada                  | Domínio                           | A quem se aplica                                                      |
+| ----------------------- | --------------------------------- | --------------------------------------------------------------------- |
+| **Regra global**        | `company_id in company_ids`       | A toda a gente. É o teto: **nunca se vê fora dos núcleos permitidos** |
+| **Regra do Utilizador** | `company_id = user.company_id.id` | Ao `Internal User`, ou seja, a todos                                  |
+| **Regra do Gestor**     | `(1, '=', 1)`                     | Só aos grupos `Manager` da área                                       |
 
 O Odoo junta-as assim: **as globais em `AND`, as de grupo em `OR`.** Daí sair exatamente o
 comportamento descrito pela operação:
@@ -100,13 +100,13 @@ comportamento descrito pela operação:
 
 Como está montado em cada modelo:
 
-| Modelo | Regra do Utilizador | Grupos com `(1,'=',1)` |
-|---|---|---|
-| `res.beneficiary` | `company_id = user.company_id.id` | Gestão de Beneficiários / Gestor, **Sistemas de Gestão** |
-| `res.food.source` | `company_id = user.company_id.id` | Coordenação / Gestor, Gestão de Fontes / Gestor, **Sistemas de Gestão** |
-| `res.support.partner` | `company_id = user.company_id.id` | Recursos Operacionais / **Gestor e Utilizador**, Apoio de Comunidade / Gestor, **Sistemas de Gestão** |
-| `res.functional.team` | `company_id = user.company_id.id` | `Read All / Funcional Team`, **Sistemas de Gestão** |
-| `hr.employee` | `company_id = user.company_id.id` (grupo `Employees / Officer`) | `Read All / Employees` |
+| Modelo                | Regra do Utilizador                                             | Grupos com `(1,'=',1)`                                                                                |
+| --------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `res.beneficiary`     | `company_id = user.company_id.id`                               | Gestão de Beneficiários / Gestor, **Sistemas de Gestão**                                              |
+| `res.food.source`     | `company_id = user.company_id.id`                               | Coordenação / Gestor, Gestão de Fontes / Gestor, **Sistemas de Gestão**                               |
+| `res.support.partner` | `company_id = user.company_id.id`                               | Recursos Operacionais / **Gestor e Utilizador**, Apoio de Comunidade / Gestor, **Sistemas de Gestão** |
+| `res.functional.team` | `company_id = user.company_id.id`                               | `Read All / Funcional Team`, **Sistemas de Gestão**                                                   |
+| `hr.employee`         | `company_id = user.company_id.id` (grupo `Employees / Officer`) | `Read All / Employees`                                                                                |
 
 Todas estas regras aceitam também `company_id = False` — um registo sem núcleo é visível para todos.
 
@@ -121,11 +121,11 @@ regra do utilizador".
 
 São três, e são implicados pelos grupos de Gestão que precisam deles:
 
-| Grupo | Utilizadores | Implicado por |
-|---|---|---|
-| `Read All / Employees` | 34 | Coordenação, Voluntários, Turnos, Formação & Qualidade, Sistemas de Gestão |
-| `Read All / Funcional Team` | 71 | Quase todos os Gestores |
-| `Read All / Resource Calendar` | 35 | Coordenação, Voluntários, Turnos, Recursos Operacionais, Formação & Qualidade, Sistemas de Gestão |
+| Grupo                          | Utilizadores | Implicado por                                                                                     |
+| ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------- |
+| `Read All / Employees`         | 34           | Coordenação, Voluntários, Turnos, Formação & Qualidade, Sistemas de Gestão                        |
+| `Read All / Funcional Team`    | 71           | Quase todos os Gestores                                                                           |
+| `Read All / Resource Calendar` | 35           | Coordenação, Voluntários, Turnos, Recursos Operacionais, Formação & Qualidade, Sistemas de Gestão |
 
 O efeito final é o mesmo — **Gestão de Voluntários / Gestor vê os voluntários de todos os núcleos
 permitidos** —, mas a ligação é indireta. **Quem quiser saber se alguém vê os voluntários de outro

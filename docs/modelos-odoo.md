@@ -90,8 +90,8 @@ Isto vale para tudo o que está documentado nos ficheiros por área, e não se r
   utilizador. Vale para as etiquetas de campo do `fields_get` e para o `name` de vários modelos,
   incluindo `product.product` e `pos.category`. **Nunca comparar nem filtrar por um nome
   traduzido: comparar ids ou códigos.** No catálogo de POS, 20 dos 24 produtos têm nomes sem
-  relação entre as duas línguas — o produto que significa "sem excedente" chama-se *Falta
-  Justificada (cópia)* em inglês. Ver [`modelos/pos.md`](modelos/pos.md).
+  relação entre as duas línguas — o produto que significa "sem excedente" chama-se _Falta
+  Justificada (cópia)_ em inglês. Ver [`modelos/pos.md`](modelos/pos.md).
 - **Campos calculados e não armazenados** (`store = false`) podem ser lidos, mas não servem para
   filtrar nem ordenar num `search_read`. `display_name` é sempre um deles.
 - **`active = false` é arquivamento**: esses registos ficam fora das pesquisas por omissão, sem

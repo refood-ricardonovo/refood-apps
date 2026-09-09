@@ -6,7 +6,7 @@
 > **Levantado em `en_US` — não confiar nos nomes.** O `explorar.ts` corria sem `lang` no contexto,
 > e nesse caso o Odoo **não** usa a língua do utilizador: cai no `en_US`. As etiquetas de campo e os
 > valores de campos traduzidos que aqui aparecem são portanto os ingleses — onde este documento diz
-> *Center*, quem trabalha no Odoo vê *Núcleo*. **A estrutura, os tipos, as relações e as contagens
+> _Center_, quem trabalha no Odoo vê _Núcleo_. **A estrutura, os tipos, as relações e as contagens
 > não são afectados.** O `explorar.ts` passou a ler em `pt_PT` e a imprimir a língua no cabeçalho
 > (`--lingua`); quando este levantamento for repetido, os nomes passam a ser os que as pessoas vêem.
 
@@ -34,10 +34,10 @@ O número que interessa é um só: **`total_in_kg`**.
 Cada núcleo tem **dois pontos de venda**, e a diferença entre eles é a diferença entre os dois lados
 da operação:
 
-| Caixa | `pos_type` | O que regista | Quem é o "cliente" |
-|---|---|---|---|
-| **Recolhas** | `collections` | Alimentos que **entram** | Uma **fonte de alimento** ([`fontes-alimento.md`](fontes-alimento.md)) |
-| **Entregas** | `deliveries` | Alimentos que **saem** | Um **beneficiário** ([`beneficiarios.md`](beneficiarios.md)) ou um **parceiro de apoio** ([`parceiros-apoio.md`](parceiros-apoio.md)) |
+| Caixa        | `pos_type`    | O que regista            | Quem é o "cliente"                                                                                                                    |
+| ------------ | ------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recolhas** | `collections` | Alimentos que **entram** | Uma **fonte de alimento** ([`fontes-alimento.md`](fontes-alimento.md))                                                                |
+| **Entregas** | `deliveries`  | Alimentos que **saem**   | Um **beneficiário** ([`beneficiarios.md`](beneficiarios.md)) ou um **parceiro de apoio** ([`parceiros-apoio.md`](parceiros-apoio.md)) |
 
 São **167 `pos.config`**: **83 núcleos com o par exato** `Recolhas` + `Entregas`, mais uma config
 `Shop` na empresa de topo, criada em 2023 e anterior ao módulo — a única sem `pos_type`, com uma
@@ -132,14 +132,14 @@ setembro de 2026, mas 2025 é praticamente tudo (7 340 e 10 085); 2024 e 2026 s�
 
 ### Identidade e numeração
 
-| Campo | Tipo | Notas |
-|---|---|---|
-| `name` | char | **Obrigatório**. `<R ou E><NUC> <AA>/<NNNNN>` |
-| `pos_reference` | char | Igual ao `name` em 17 681 dos 17 703 |
-| `sequence_number` | integer | Ordem dentro da sessão; 1 a 174 |
-| `session_id` | many2one → `pos.session` | **Obrigatório**; o caminho para o tipo de caixa |
-| `company_id` | many2one → `res.company` | **Obrigatório**; o núcleo |
-| `date_order` | datetime | UTC, como todos |
+| Campo             | Tipo                     | Notas                                           |
+| ----------------- | ------------------------ | ----------------------------------------------- |
+| `name`            | char                     | **Obrigatório**. `<R ou E><NUC> <AA>/<NNNNN>`   |
+| `pos_reference`   | char                     | Igual ao `name` em 17 681 dos 17 703            |
+| `sequence_number` | integer                  | Ordem dentro da sessão; 1 a 174                 |
+| `session_id`      | many2one → `pos.session` | **Obrigatório**; o caminho para o tipo de caixa |
+| `company_id`      | many2one → `res.company` | **Obrigatório**; o núcleo                       |
+| `date_order`      | datetime                 | UTC, como todos                                 |
 
 O `name` codifica três coisas: **a letra `R` de Recolhas ou `E` de Entregas**, as **três letras do
 núcleo** (as mesmas dos prefixos das fichas — ver [`voluntarios.md`](voluntarios.md)), e depois
@@ -153,14 +153,14 @@ O contador, esse, **não é fiável**: as 29 séries (config × ano) não começ
 
 ### Quem — e o problema de proteção de dados que isto levanta
 
-| Campo | Tipo | Preenchido | Notas |
-|---|---|---|---|
-| `partner_id` | many2one → `res.partner` | **17 703 (100%)** | O espelho da ficha |
-| `client_name` | char | **17 703 (100%)** | `refood_pos`. **O nome legível, em texto** |
-| `user_id` | many2one → `res.users` | 17 703 | Quem estava no ecrã |
-| `cashier` | char | 17 703 | `pos_hr`. O nome do `user_id` em 17 529 dos 17 703 |
-| `employee_id` | many2one → `hr.employee` | **0** | O `pos_hr` está instalado mas não é usado |
-| `note` | text | 207 | Notas internas |
+| Campo         | Tipo                     | Preenchido        | Notas                                              |
+| ------------- | ------------------------ | ----------------- | -------------------------------------------------- |
+| `partner_id`  | many2one → `res.partner` | **17 703 (100%)** | O espelho da ficha                                 |
+| `client_name` | char                     | **17 703 (100%)** | `refood_pos`. **O nome legível, em texto**         |
+| `user_id`     | many2one → `res.users`   | 17 703            | Quem estava no ecrã                                |
+| `cashier`     | char                     | 17 703            | `pos_hr`. O nome do `user_id` em 17 529 dos 17 703 |
+| `employee_id` | many2one → `hr.employee` | **0**             | O `pos_hr` está instalado mas não é usado          |
+| `note`        | text                     | 207               | Notas internas                                     |
 
 O `partner_id` é o espelho no `res.partner`, e aponta exatamente para onde se espera:
 
@@ -193,14 +193,14 @@ lado tem o nome. Isto é uma decisão a tomar em cada rota, não um detalhe de a
 
 ### Quanto
 
-| Campo | Tipo | Notas |
-|---|---|---|
-| `total_in_kg` | float | `refood_pos`. **O único número com significado** |
-| `state` | selection | Só aparecem `'done'` (17 646) e `'paid'` (57) |
-| `customer_count` | integer | `refood_pos`, "N° meals". **Facultativo, e zero nas 17 703** |
-| `delivered_box` / `returned_box` | integer | `refood_pos`. Diferentes de zero em 34 e 33, só nas Entregas |
-| `prepared`, `to_invoice`, `is_tipped` | boolean | **Falsos nas 17 703** |
-| `nb_print` | integer | Zero nas 17 703 |
+| Campo                                 | Tipo      | Notas                                                        |
+| ------------------------------------- | --------- | ------------------------------------------------------------ |
+| `total_in_kg`                         | float     | `refood_pos`. **O único número com significado**             |
+| `state`                               | selection | Só aparecem `'done'` (17 646) e `'paid'` (57)                |
+| `customer_count`                      | integer   | `refood_pos`, "N° meals". **Facultativo, e zero nas 17 703** |
+| `delivered_box` / `returned_box`      | integer   | `refood_pos`. Diferentes de zero em 34 e 33, só nas Entregas |
+| `prepared`, `to_invoice`, `is_tipped` | boolean   | **Falsos nas 17 703**                                        |
+| `nb_print`                            | integer   | Zero nas 17 703                                              |
 
 Dos cinco estados possíveis (`draft`, `cancel`, `paid`, `done`, `invoiced`) só existem dois, e o
 `'paid'` são 57 encomendas de sessões que ficaram por fechar — **20 sessões continuam abertas**, a
@@ -223,10 +223,10 @@ o estorno abater, que é o que se quer; o que não se pode é ler o sinal como "
 
 A distribuição do `total_in_kg` por encomenda:
 
-| | mín | p25 | mediana | p75 | p95 | p99 | máx |
-|---|---|---|---|---|---|---|---|
-| Recolhas | -64 358 | 5,9 | 15,8 | 54,1 | 125 | 231 | 111 111 |
-| Entregas | -71 150 | 9,7 | 14,6 | 19,9 | 40 | 113 | 20 000 124 |
+|          | mín     | p25 | mediana | p75  | p95 | p99 | máx        |
+| -------- | ------- | --- | ------- | ---- | --- | --- | ---------- |
+| Recolhas | -64 358 | 5,9 | 15,8    | 54,1 | 125 | 231 | 111 111    |
+| Entregas | -71 150 | 9,7 | 14,6    | 19,9 | 40  | 113 | 20 000 124 |
 
 A mediana é um registo plausível de quem pesa comida; os extremos não são. **8 registos de Recolhas e
 36 de Entregas passam os 1 000 kg**, e bastam para dominar qualquer soma: o total das Entregas é
@@ -252,15 +252,15 @@ cabaz. Oito encomendas de Entregas não têm linhas nenhumas.
 O modelo é o standard do Odoo. O `refood_pos` acrescenta um campo só (`pack_scrap_ids`), e nada dos
 campos de preço é usado: `price_unit` e `discount` estão a zero em todas as linhas.
 
-| Campo | Tipo | Notas |
-|---|---|---|
-| `order_id` | many2one → `pos.order` | **Obrigatório** |
-| `product_id` | many2one → `product.product` | **Obrigatório**; a categoria de alimento |
-| `qty` | float | A quantidade — **kg ou unidades, conforme o produto** |
-| `product_uom_id` | many2one → `uom.uom` | **`kg` ou `Units`, e é o que decide tudo** |
-| `full_product_name` | char | Cópia do nome do produto |
-| `company_id` | many2one → `res.company` | O núcleo |
-| `price_unit`, `price_subtotal`, `discount`, `tax_ids` | | Zero / vazios |
+| Campo                                                 | Tipo                         | Notas                                                 |
+| ----------------------------------------------------- | ---------------------------- | ----------------------------------------------------- |
+| `order_id`                                            | many2one → `pos.order`       | **Obrigatório**                                       |
+| `product_id`                                          | many2one → `product.product` | **Obrigatório**; a categoria de alimento              |
+| `qty`                                                 | float                        | A quantidade — **kg ou unidades, conforme o produto** |
+| `product_uom_id`                                      | many2one → `uom.uom`         | **`kg` ou `Units`, e é o que decide tudo**            |
+| `full_product_name`                                   | char                         | Cópia do nome do produto                              |
+| `company_id`                                          | many2one → `res.company`     | O núcleo                                              |
+| `price_unit`, `price_subtotal`, `discount`, `tax_ids` |                              | Zero / vazios                                         |
 
 ### `total_in_kg` = soma das linhas **em kg**
 
@@ -284,27 +284,27 @@ não confecionado), pratos combinados, acompanhamentos, bolos, ração animal, e
 Quatro categorias de POS (`pos_categ_id`) organizam-nas, e a unidade separa-as em duas famílias que
 não se misturam:
 
-| `pos_categ_id` | Unidade | O que é |
-|---|---|---|
-| **Alimentos** | `kg` | As categorias de comida. Entram no `total_in_kg` |
-| **Diversos** (*Outros* em `en_US`) | `kg` | Ração animal, orgânico para animais. Entram no `total_in_kg` |
-| **Cabazes** | `Units` e `kg` | "Cabaz Parceiro" — existe **nas duas unidades**, em registos diferentes |
-| **Observações** | `Units` | Três produtos, e **um deles não é uma falta** — ver a seguir |
+| `pos_categ_id`                     | Unidade        | O que é                                                                 |
+| ---------------------------------- | -------------- | ----------------------------------------------------------------------- |
+| **Alimentos**                      | `kg`           | As categorias de comida. Entram no `total_in_kg`                        |
+| **Diversos** (_Outros_ em `en_US`) | `kg`           | Ração animal, orgânico para animais. Entram no `total_in_kg`            |
+| **Cabazes**                        | `Units` e `kg` | "Cabaz Parceiro" — existe **nas duas unidades**, em registos diferentes |
+| **Observações**                    | `Units`        | Três produtos, e **um deles não é uma falta** — ver a seguir            |
 
-**O nome da categoria 4 é o primeiro sítio onde a língua se nota:** é *Diversos* em `pt_PT` e
-*Outros* em `en_US`. As restantes três têm o mesmo nome nas duas línguas. A app filtra pela
-categoria *Observações*, e é por isso que funciona — mas é sorte, não desenho.
+**O nome da categoria 4 é o primeiro sítio onde a língua se nota:** é _Diversos_ em `pt_PT` e
+_Outros_ em `en_US`. As restantes três têm o mesmo nome nas duas línguas. A app filtra pela
+categoria _Observações_, e é por isso que funciona — mas é sorte, não desenho.
 
-### Os três produtos de *Observações*, e a armadilha da tradução
+### Os três produtos de _Observações_, e a armadilha da tradução
 
 **Um dos três não é uma falta.** Referências Internas (`default_code`) preenchidas em 2026-09-08,
 precisamente para haver uma chave que não seja o id nem o nome:
 
-| id | `default_code` | nome em `pt_PT` | nome em `en_US` | significa |
-|---|---|---|---|---|
-| 27 | `OBS-FALTA-INJ` | Falta Injustificada | Falta Injustificada | falta |
-| 28 | `OBS-FALTA-JUST` | Falta Justificada | Falta Injustificada (cópia) | falta |
-| 37 | `OBS-SEM-EXC` | **Sem excedente** | **Falta Justificada (cópia)** | **a fonte não tinha excedente** |
+| id  | `default_code`   | nome em `pt_PT`     | nome em `en_US`               | significa                       |
+| --- | ---------------- | ------------------- | ----------------------------- | ------------------------------- |
+| 27  | `OBS-FALTA-INJ`  | Falta Injustificada | Falta Injustificada           | falta                           |
+| 28  | `OBS-FALTA-JUST` | Falta Justificada   | Falta Injustificada (cópia)   | falta                           |
+| 37  | `OBS-SEM-EXC`    | **Sem excedente**   | **Falta Justificada (cópia)** | **a fonte não tinha excedente** |
 
 **O produto que significa "não havia nada para recolher" chama-se "Falta Justificada (cópia)" em
 inglês.** Qualquer regra por nome — ou por substring `/falta/i` — classifica-o como falta em
@@ -312,7 +312,7 @@ silêncio. É o exemplo que fundamenta a regra transversal: **comparar ids e có
 
 O mesmo vale para o catálogo inteiro: **20 dos 24 produtos de POS têm nomes sem relação entre as
 duas línguas**, porque os valores `en_US` ficaram com os "(cópia)" de duplicações antigas. O
-produto 16 é *Bolos* em `pt_PT` e *Acompanhamentos (cópia)* em `en_US`.
+produto 16 é _Bolos_ em `pt_PT` e _Acompanhamentos (cópia)_ em `en_US`.
 
 **As observações aparecem nas duas caixas**, porque `limit_categories` é `false` nas 166 caixas e
 os produtos são globais (sem `company_id`). Contagens em staging, sem estornos: **Recolhas** 25
