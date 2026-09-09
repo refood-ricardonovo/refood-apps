@@ -1,0 +1,26 @@
+# Terminações de linha, fixadas no repositório e não na configuração de cada máquina.
+#
+# **LF em todo o lado — no repositório e na árvore de trabalho.** Sem isto vale o
+# `core.autocrlf` de quem clonou, que no Windows está a `true` e converte na ida e na volta.
+# Toda esta árvore está em LF hoje; o que a regra faz é garantir que continua, mesmo em quem
+# clonar de fresco com outra configuração.
+*                text=auto eol=lf
+
+# **As migrações não podem mudar de terminação, e a razão não é de gosto.** Estes ficheiros já
+# correram contra o D1 de staging. O livro-razão do D1 indexa pelo **nome do ficheiro, sem
+# checksum**, portanto ninguém dá por uma alteração de conteúdo — mas o que está na base foi
+# aplicado a partir destes bytes, e uma cópia que já não seja byte a byte a mesma deixa de
+# poder ser comparada com o que lá está. Fica explícito para se ver ao lado da razão.
+migrations/*.sql text eol=lf
+
+# Binários: nem deteção, nem conversão, nem diff. O `text=auto` acima já os reconheceria, mas
+# uma fonte ou um ícone corrompido por uma conversão de terminações não dá erro — dá um ecrã
+# sem tipo de letra, semanas depois.
+*.woff2          binary
+*.png            binary
+*.ico            binary
+
+# **Os logótipos vieram da sede e ficam como vieram.** Um deles está em CRLF; é um ficheiro que
+# não escrevemos e que se há-de comparar com o original que a sede voltar a mandar. Normalizá-lo
+# fazia-o divergir do que temos em mãos, sem ganho nenhum — um SVG de logótipo não se lê em diff.
+*.svg            -text
