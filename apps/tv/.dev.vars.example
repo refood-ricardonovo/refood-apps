@@ -1,3 +1,5 @@
 # Copia para .dev.vars e preenche. Em producao usa: wrangler secret put ODOO_USERNAME
 ODOO_USERNAME=""
 ODOO_PASSWORD=""
+# Segredo unico da sede, para /api/admin/*. Em producao: wrangler secret put ADMIN_SECRET
+ADMIN_SECRET=""

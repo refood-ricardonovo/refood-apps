@@ -1,0 +1,1624 @@
+<!doctype html>
+<html lang="pt-PT">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Refood — entregas</title>
+		<link rel="icon" href="/img/favicon.ico" sizes="any" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<style>
+			/*
+			 * O painel de entregas. Televisor de cozinha, visto de três a quatro metros, ligado
+			 * horas seguidas — e ninguém se aproxima para ler.
+			 *
+			 * Três decisões mandam em tudo o que está aqui:
+			 *
+			 * 1. **A grelha é estável.** Ordenada por número, sempre. Nada muda de lugar durante o
+			 *    turno, nem as faltas: quem procura o B47 encontra-o no mesmo sítio da última vez
+			 *    que olhou. Um cartão que salta é um cartão que se perde. **Um extra aparece no fim
+			 *    e fica lá** — intercalado, empurrava todos os cartões abaixo dele a meio do turno.
+			 * 2. **Nunca esconder, nunca paginar.** O que aperta é o tamanho dos cartões, não a
+			 *    quantidade. Uma família que não cabe é uma família que não é servida.
+			 * 3. **A cor nunca é o único sinal.** A três metros, de lado, e com daltonismo entre os
+			 *    voluntários, a cor sozinha não chega. Cada estado leva também forma e símbolo.
+			 */
+			* {
+				box-sizing: border-box;
+				margin: 0;
+			}
+
+			body {
+				background: var(--n-950);
+				color: var(--n-000);
+				font-family: var(--fonte);
+				font-weight: 500; /* sobre fundo escuro, o 400 esvai-se a três metros */
+				font-size: 40px;
+				line-height: 1.2;
+				height: 100vh;
+				overflow: hidden;
+				display: grid;
+				grid-template-rows: auto 1fr auto;
+				gap: var(--e-6);
+				padding: var(--e-6);
+				font-variant-numeric: tabular-nums;
+			}
+
+			/* ------------------------------------------------------------- cabeçalho */
+
+			/*
+			 * **O cabeçalho tem altura fixa, e é a regra que manda nele.**
+			 *
+			 * Não é estética: a grelha vive no que sobra, e um cabeçalho que cresça uma linha rouba
+			 * uma linha de cartões — que é uma fila de famílias fora do ecrã, sem aviso. Já
+			 * aconteceu. Portanto a altura é um número, o conteúdo encolhe ou é cortado dentro dela,
+			 * e a grelha recebe sempre o mesmo espaço, com 7 famílias ou com 90.
+			 *
+			 * Três colunas: o logótipo, as coordenadas da vista, e o que identifica o sítio e a
+			 * hora. A navegação fica por baixo da terceira.
+			 */
+			/*
+			 * Quatro colunas, e a ordem não é arbitrária: **o controlo do dia e o do turno ficam nas
+			 * pontas**, com a identidade do sítio pelo meio. Encostados um ao outro liam-se como um
+			 * só controlo, e as setas do dia pareciam mudar o turno.
+			 *
+			 * A altura é fixa porque a grelha vive no que sobra: um cabeçalho que cresça uma linha
+			 * rouba uma linha de cartões, que são dez famílias fora do ecrã sem aviso.
+			 */
+			header {
+				height: 132px;
+				overflow: hidden;
+				display: grid;
+				grid-template-columns: auto minmax(0, 1fr) auto auto;
+				grid-template-rows: auto auto;
+				align-content: center;
+				align-items: center;
+				column-gap: var(--e-6);
+				row-gap: var(--e-1);
+				border-bottom: 2px solid var(--n-800);
+			}
+
+			/*
+			 * O símbolo, sem o lettering.
+			 *
+			 * O cabeçalho já diz "PT Núcleo <nome>" em texto, e o lockup horizontal repetia a
+			 * palavra REFOOD ao lado disso enquanto comia 240px de largura que os cartões usam. O
+			 * símbolo diz o mesmo e ocupa um terço.
+			 *
+			 * **O mínimo de 240px do `design.md` não se aplica aqui:** é a regra da variante
+			 * horizontal, e esta não é uma variante — é o símbolo isolado, que o guia da marca não
+			 * prevê. A decisão está registada no `design.md`. Dimensiona-se pela altura, para
+			 * assentar no cabeçalho, com folga à volta bem acima da largura do próprio traço.
+			 */
+			/*
+			 * Cada filho do cabeçalho leva coluna e linha escritas à mão.
+			 *
+			 * Sem isso a colocação automática da grelha põe primeiro os itens com linha definida — o
+			 * logótipo e o controlo do turno — e o turno saltava para junto do logótipo, que é
+			 * exactamente a adjacência que este desenho existe para desfazer.
+			 */
+			.logotipo {
+				grid-column: 1;
+				grid-row: 1 / -1;
+				height: 96px;
+				width: auto;
+				margin-right: var(--e-4);
+			}
+
+			.dia-controlo {
+				grid-column: 2;
+				grid-row: 1;
+			}
+
+			.identidade {
+				grid-column: 3;
+				grid-row: 1 / -1;
+			}
+
+			.turno-controlo {
+				grid-column: 4;
+				grid-row: 1 / -1;
+			}
+
+			.contagens {
+				grid-column: 2;
+				grid-row: 2;
+			}
+
+			/* A linha de cima é **sempre uma só linha**, aconteça o que acontecer ao resto. */
+			.coordenadas {
+				display: flex;
+				align-items: baseline;
+				gap: var(--e-4);
+				min-width: 0;
+				white-space: nowrap;
+				overflow: hidden;
+			}
+
+			.dia {
+				font-size: 56px;
+				font-weight: var(--peso-destaque);
+			}
+
+			/* Só a primeira letra: `capitalize` dava "Quinta-Feira", e em português é "Quinta-feira". */
+			.dia::first-letter {
+				text-transform: uppercase;
+			}
+
+			/* A relação com hoje é o que impede alguém de ler o ecrã de amanhã como se fosse o de hoje. */
+			.relacao {
+				font-size: 36px;
+				color: var(--marca-amarelo); /* amarelo sobre escuro: 11,7:1, o acento mais forte que a marca permite */
+				font-weight: var(--peso-enfase);
+			}
+
+			.contagens {
+				font-size: 32px;
+				color: var(--n-400);
+				display: flex;
+				gap: var(--e-6);
+				white-space: nowrap;
+				overflow: hidden;
+			}
+
+			.contagens b {
+				color: var(--n-000);
+				font-weight: var(--peso-enfase);
+			}
+
+			/*
+			 * O peso do turno, no cabeçalho, com a mesma cor de "feito" dos cartões.
+			 *
+			 * **É a soma exacta dos números que estão nos cartões** — o servidor arredonda cada um e
+			 * soma depois, precisamente para que quem somar o ecrã à mão obtenha este valor.
+			 */
+			.contagens .peso-total b {
+				color: var(--ok-claro);
+			}
+
+			/*
+			 * O aviso de valores fora de escala.
+			 *
+			 * **Existe para um número absurdo não desaparecer em silêncio.** Um peso acima do tecto de
+			 * plausibilidade não entra na soma e não aparece no cartão — mas se também não fosse dito
+			 * em sítio nenhum, ninguém o iria corrigir no Odoo. Em cerca de 5% dos dias de entregas e
+			 * 0,5% dos de recolhas isto aparece.
+			 *
+			 * Não é vermelho: não é um erro da operação, é um registo que precisa de ser visto.
+			 */
+			.contagens .fora-de-escala {
+				color: var(--info-claro);
+			}
+
+			/*
+			 * O contador de extras, e o de encomendas por identificar.
+			 *
+			 * **Os extras são contados à parte dos previstos, e não somados a eles.** As três
+			 * primeiras contagens do cabeçalho descrevem a escala do dia — quantas famílias estavam
+			 * previstas, quantas já foram servidas, quantas faltaram —, e é isso que quem está na
+			 * cozinha lê para saber quanto falta fazer. Um extra não estava previsto: somá-lo ao
+			 * total fazia o denominador mexer-se durante o turno.
+			 *
+			 * O "por identificar" segue a mesma regra do fora de escala, e pela mesma razão: são
+			 * encomendas que aconteceram e que não aparecem em cartão nenhum — quase sempre uma
+			 * ficha arquivada —, e uma coisa que desaparece em silêncio é um erro que ninguém
+			 * corrige. Em regime está a zero, e por isso o grupo só aparece quando não está.
+			 */
+			.contagens .extras {
+				color: var(--marca-amarelo);
+			}
+
+			.contagens .por-identificar {
+				color: var(--info-claro);
+			}
+
+			/* O sítio e a hora, à direita e numa linha só. O núcleo corta com reticências se for comprido. */
+			/*
+			 * O sítio e o turno, em duas linhas.
+			 *
+			 * **O nome do turno está aqui e não no separador** porque o separador só tem a hora, e a
+			 * hora não chega para identificar: há núcleos com seis turnos de recolha no mesmo dia, e
+			 * dois deles começam ambos às 18:00 — `Turno 2.18` e `Turno 2.18 Hiper`. O que os separa
+			 * é o nome, e havia espaço por baixo do núcleo.
+			 */
+			.identidade {
+				display: flex;
+				flex-direction: column;
+				align-items: flex-end;
+				justify-content: center;
+				gap: var(--e-1);
+				min-width: 0;
+				white-space: nowrap;
+			}
+
+			.turno-nome {
+				font-size: 26px;
+				color: var(--n-600);
+				overflow: hidden;
+				text-overflow: ellipsis;
+				max-width: 100%;
+			}
+
+			.nucleo {
+				font-size: 32px;
+				color: var(--n-400);
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			/*
+			 * **A hora a que estamos.** Num ecrã que fica ligado cinco horas seguidas numa cozinha, é
+			 * das coisas mais úteis que lá podem estar — e é a única coisa neste painel que muda
+			 * sozinha sem ser um dado do Odoo.
+			 */
+			.agora {
+				flex: none;
+				margin-left: auto;
+				font-size: 32px;
+				font-weight: var(--peso-destaque);
+				color: var(--n-400);
+			}
+
+			/* --------------------------------------------------------------- navegação */
+
+			/*
+			 * **Não há um único elemento focável neste ecrã, e é deliberado.**
+			 *
+			 * O browser de uma Android TV usa as setas do comando para mover o foco entre elementos
+			 * clicáveis. Se aqui houvesse um `<button>`, cada seta faria duas coisas ao mesmo tempo:
+			 * a nossa navegação e o salto de foco do browser. Por isso os controlos são `<div>`, que
+			 * não entram na navegação por foco, e quem ouve as teclas é a janela.
+			 *
+			 * O clique continua a funcionar — é como se testa no PC —, mas é o acessório, não o
+			 * caminho principal. Este ecrã é para olhar; quem o opera tem um comando na mão.
+			 */
+			.seta {
+				color: var(--n-400);
+				line-height: 1;
+				user-select: none;
+				cursor: pointer;
+				transition: color 120ms ease;
+			}
+
+			.seta:hover {
+				color: var(--n-000);
+			}
+
+			.seta[data-inativa='sim'] {
+				color: var(--n-800);
+				cursor: default;
+			}
+
+			/*
+			 * **A forma da seta diz qual é o eixo.** Chevrons horizontais mudam o dia, triângulos
+			 * verticais mudam o turno — é o mapeamento do comando desenhado no ecrã. Os dois
+			 * controlos ficam em pontas opostas do cabeçalho, com o núcleo e o relógio pelo meio:
+			 * encostados um ao outro, pareciam um só, e as setas do dia liam-se como do turno.
+			 */
+			.dia-controlo {
+				display: flex;
+				align-items: baseline;
+				gap: var(--e-4);
+				min-width: 0;
+				white-space: nowrap;
+				overflow: hidden;
+			}
+
+			.dia-controlo .seta {
+				font-size: 48px;
+			}
+
+			/*
+			 * O turno: as setas empilhadas à volta da hora actual, e **não a lista dos turnos**.
+			 *
+			 * Empilhar a lista era tentador — mostrava tudo — mas em 93 das 134 combinações de
+			 * núcleo e dia há **um turno só**, e uma lista de um elemento é um rótulo com ar de menu.
+			 * Assim o controlo tem sempre a mesma altura, com um turno ou com três (o máximo medido
+			 * na base), e os pontos dizem em qual se está sem ocupar espaço.
+			 */
+			.turno-controlo {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: var(--e-1);
+				min-width: 140px;
+				padding-left: var(--e-6);
+			}
+
+			/* Sem etiqueta, `20:00` ao lado de `23:31` são dois relógios e ninguém sabe qual é qual. */
+			.turno-etiqueta {
+				font-size: 18px;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+				color: var(--n-600);
+				line-height: 1;
+			}
+
+			.turno-controlo .seta {
+				font-size: 26px;
+			}
+
+			.turno-hora {
+				font-size: 40px;
+				font-weight: var(--peso-destaque);
+				color: var(--marca-amarelo); /* sobre escuro são 11,7:1 */
+				line-height: 1.1;
+			}
+
+			.turno-pontos {
+				display: flex;
+				gap: 7px;
+				height: 12px;
+				align-items: center;
+			}
+
+			.turno-pontos i {
+				width: 10px;
+				height: 10px;
+				border-radius: 50%;
+				background: var(--n-600); /* --n-800 não se via sobre --n-950 */
+			}
+
+			.turno-pontos i[data-actual='sim'] {
+				background: var(--marca-amarelo);
+			}
+
+			/* Com um turno só não há para onde ir, mas a hora fica: quem entra tem de saber o que vê. */
+			.turno-controlo[data-unico='sim'] .seta,
+			.turno-controlo[data-unico='sim'] .turno-pontos {
+				visibility: hidden;
+			}
+
+			/* ------------------------------------------------------------------ corpo */
+
+			/*
+			 * A coluna de notas está estreita **enquanto estiver vazia**. O espaço reservado tem de
+			 * se ver — senão ninguém repara quando o conteúdo chegar —, mas 300px para mostrar um
+			 * travessão é largura tirada aos cartões, que é onde ela faz falta. Alarga quando a PWA
+			 * tiver recados para lá pôr.
+			 */
+			.corpo {
+				display: grid;
+				min-height: 0;
+			}
+
+			/*
+			 * **A largura do cartão tem tecto.** Com poucas famílias, esticar as colunas até encher
+			 * a linha dava cartões enormes com três palavras lá dentro, e ecrã vazio do lado de lá.
+			 * A densidade adaptativa é para dar folga, não para encher: o cartão cresce até ao que a
+			 * informação justifica e pára, e a grelha fica centrada no espaço que sobra.
+			 */
+			.grelha {
+				display: grid;
+				/*
+				 * **A largura sai do máximo das duas linhas, não do número.**
+				 *
+				 * O número tem 4 caracteres — `B912` —, e a linha de baixo tem 11: `19:30  3A 4C`.
+				 * Dimensionar pelo número dava cartões que cortavam a linha de baixo. O
+				 * `min-content` é a largura da linha mais larga que não quebra, portanto o cartão
+				 * nunca fica mais estreito do que o seu conteúdo; o `--largura` é só o tecto.
+				 */
+				grid-template-columns: repeat(var(--colunas, 6), minmax(min-content, var(--largura, 240px)));
+				justify-content: center;
+				gap: var(--folga, 12px);
+				align-content: start;
+				min-height: 0;
+			}
+
+			/*
+			 * A densidade é escolhida pela contagem, não pelo espaço disponível: com 20 famílias o
+			 * ecrã respira, com 90 aperta. Degraus e não um cálculo contínuo, para que a grelha não
+			 * mude de forma por causa de uma família a mais.
+			 *
+			 * **Nada é escondido em degrau nenhum.** O que encolhe é o tamanho; o número, a hora e
+			 * as pessoas estão sempre lá. Esconder a hora seria o mesmo que paginar: quem está na
+			 * cozinha deixava de ter no ecrã uma coisa de que precisa, e não saberia que faltava.
+			 *
+			 * No degrau mais apertado o secundário desce aos 24px, abaixo do chão de 32px do
+			 * `design.md`. É uma cedência consciente e está anotada no resumo de decisões: com 90
+			 * famílias num 1080p não cabem as duas coisas, e a alternativa era esconder dados.
+			 */
+			.grelha[data-densidade='folgada'] {
+				--colunas: 5;
+				--largura: 300px;
+				--numero: 64px;
+				--detalhe: 32px;
+			}
+			.grelha[data-densidade='normal'] {
+				--colunas: 7;
+				--largura: 248px;
+				--numero: 52px;
+				--detalhe: 28px;
+			}
+			.grelha[data-densidade='apertada'] {
+				--colunas: 9;
+				--largura: 196px;
+				--numero: 44px;
+				--detalhe: 24px;
+				--folga: 10px;
+				--respiro: 6px;
+				--respiro-h: 10px;
+			}
+			.grelha[data-densidade='cheia'] {
+				--colunas: 10;
+				--largura: 180px;
+				--numero: 40px; /* o mínimo absoluto do `design.md` para um televisor */
+				--detalhe: 20px; /* abaixo do chão de 32px: ver a nota acima */
+				--folga: 8px;
+				--respiro: 4px;
+				--respiro-h: 8px;
+			}
+
+			/* --------------------------------------------------- densidade das recolhas */
+
+			/*
+			 * As recolhas têm menos cartões — o maior turno da base tem 29 fontes, contra 90 famílias
+			 * — mas cada cartão é muito mais largo, porque leva o **nome** ao lado do número.
+			 *
+			 * O nome mais comprido da base tem **55 caracteres**: *"Supermercado Continente - Bom Dia
+			 * - Gândara dos Olivais"*. Não é caso raro de laboratório: 48% passam os 20 caracteres e
+			 * 13% passam os 30. É o nome, e não o número, que dita a largura da coluna.
+			 */
+			/*
+			 * **A altura da linha é fixa, não sai do conteúdo.**
+			 *
+			 * Com nomes de comprimento muito diferente — de 3 a 55 caracteres —, deixar a linha
+			 * crescer com o cartão mais alto empurrava as últimas linhas para fora do ecrã. Fixa, um
+			 * cartão impossível transborda a si próprio, à vista, em vez de esconder uma fila
+			 * inteira de fontes.
+			 */
+			/*
+			 * **A linha tem a altura do conteúdo, com tecto.**
+			 *
+			 * Fixá-la punha o cartão a reservar espaço que muitas vezes não usava: com um nome de
+			 * uma linha só, sobrava um vazio a separar o nome da hora — que se lia como um erro de
+			 * alinhamento e não como folga. Agora a linha encolhe até ao conteúdo, e o `--altura` é
+			 * o limite que impede uma fila de cartões de sair do ecrã.
+			 *
+			 * A sobra vai para baixo da grelha, onde não se vê, em vez de ficar dentro dos cartões.
+			 */
+			.grelha[data-area='recolhas'] {
+				grid-auto-rows: min-content;
+			}
+
+			/*
+			 * Os cartões de recolha: altura limitada, e o conteúdo empacotado a partir de cima.
+			 *
+			 * A hora vem **logo depois do nome**, não encostada ao fundo. Encostadas ao fundo
+			 * alinhavam entre cartões da mesma linha, o que era bonito — mas com um nome curto abria
+			 * um vazio no meio do cartão, e um vazio no meio lê-se como coisa que falta.
+			 *
+			 * **Está preso à área e não ao estado**, e a diferença acabou por importar: era uma lista
+			 * de dois estados — `por_recolher` e `recolhido` —, que descrevia "todos os cartões de
+			 * recolha" por serem os únicos que havia. Ao passar a existir `falta` nas recolhas, essa
+			 * lista deixava um cartão de fora e o conteúdo dele espalhava-se. É o que uma regra de
+			 * layout escrita como se fosse regra de estado faz quando o estado cresce.
+			 */
+			.grelha[data-area='recolhas'] .cartao {
+				max-height: var(--altura, 124px);
+				align-content: start;
+			}
+
+			.grelha[data-area='recolhas'][data-densidade='folgada'] {
+				--colunas: 3;
+				--largura: 600px;
+				--altura: 190px;
+				--nome: 34px;
+				--detalhe: 26px;
+			}
+			.grelha[data-area='recolhas'][data-densidade='normal'] {
+				--colunas: 5;
+				--largura: 372px;
+				--altura: 124px; /* 30 fontes ÷ 5 = 6 linhas */
+				--nome: 26px;
+				--detalhe: 21px;
+			}
+			/*
+			 * A altura de cada degrau sai da conta, não do gosto: com a área da grelha em 804px,
+			 * `altura = (804 - (linhas-1) × folga) / linhas`, e as linhas são o tecto do degrau a
+			 * dividir pelas colunas. Um número a mais aqui é uma fila de fontes fora do ecrã.
+			 */
+			.grelha[data-area='recolhas'][data-densidade='apertada'] {
+				--colunas: 6;
+				--largura: 306px;
+				--altura: 106px; /* 42 fontes ÷ 6 = 7 linhas */
+				--nome: 22px;
+				--detalhe: 18px;
+				--folga: 10px;
+				--respiro: 6px;
+			}
+			.grelha[data-area='recolhas'][data-densidade='cheia'] {
+				--colunas: 7;
+				--largura: 260px;
+				--altura: 73px; /* até 70 fontes ÷ 7 = 10 linhas */
+				--nome: 19px;
+				--detalhe: 16px;
+				--folga: 8px;
+				--respiro: 2px;
+			}
+
+			/* ---------------------------------------------------------------- cartões */
+
+			/*
+			 * **O estado é uma dimensão do cartão, não um caso especial.**
+			 *
+			 * Toda a aparência do estado sai de três variáveis — a cor, o símbolo e se preenche —,
+			 * e o bloco de cada estado é o único sítio onde elas se escrevem. Acrescentar o quarto
+			 * estado ("à espera", quando a PWA registar quem chegou) é acrescentar um bloco destes:
+			 * uma cor nova, um símbolo, e mais nada. Nenhuma regra de desenho tem de saber que ele
+			 * existe.
+			 */
+			.cartao {
+				--cor: var(--n-400);
+				--marca: '';
+				--fundo: transparent;
+
+				background: var(--fundo);
+				border: 3px solid var(--cor);
+				border-left-width: 12px; /* a barra grossa lê-se de longe mesmo sem se distinguir a cor */
+				border-radius: 8px;
+				padding: var(--respiro, 8px) var(--respiro-h, 12px);
+				display: grid;
+				grid-template-columns: 1fr auto;
+				align-items: center;
+				gap: var(--e-1) var(--e-2);
+				/*
+				 * Sem `overflow: hidden` e **sem `min-width: 0`**. Os dois cortam texto em silêncio,
+				 * e o segundo era o que anulava o `min-content` da grelha: com ele, o cartão podia
+				 * encolher abaixo do seu próprio conteúdo e comia o "C" do "12A 10C". Um cartão que
+				 * corta texto está mal dimensionado, e quer-se ver isso a transbordar num ecrã de
+				 * teste, não descobri-lo numa cozinha.
+				 */
+			}
+
+			.cartao[data-estado='por_entregar'] {
+				--cor: var(--n-400);
+				--marca: '·';
+			}
+
+			.cartao[data-estado='entregue'] {
+				--cor: var(--ok-claro);
+				--marca: '✓';
+				--fundo: color-mix(in srgb, var(--ok-claro) 14%, transparent);
+			}
+
+			.cartao[data-estado='falta'] {
+				--cor: var(--erro-claro);
+				--marca: '✕';
+				--fundo: color-mix(in srgb, var(--erro-claro) 14%, transparent);
+				border-style: dashed;
+				border-left-style: solid;
+			}
+
+			/* O quarto estado entra aqui, e é só isto:
+			.cartao[data-estado='a_espera'] {
+				--cor: var(--info-claro);
+				--marca: '◔';
+				--fundo: color-mix(in srgb, var(--info-claro) 14%, transparent);
+			} */
+
+			/*
+			 * As recolhas têm três estados: por recolher, recolhido e falta.
+			 *
+			 * Dizia aqui "não há faltas — uma fonte que não tinha excedentes não é uma falta de
+			 * ninguém", e a segunda metade continua verdadeira: o "sem excedente" tem produto próprio
+			 * no POS e conta como **recolhido**. Mas faltas há, e havia antes de alguém dar por isso —
+			 * 25 na base desde 2024-10-31, que este painel mostrava com o visto verde.
+			 *
+			 * O `falta` não precisa de bloco próprio: o das entregas não está preso a área nenhuma.
+			 */
+			.cartao[data-estado='por_recolher'] {
+				--cor: var(--n-400);
+				--marca: '·';
+			}
+
+			.cartao[data-estado='recolhido'] {
+				--cor: var(--ok-claro);
+				--marca: '✓';
+				--fundo: color-mix(in srgb, var(--ok-claro) 14%, transparent);
+			}
+
+			/*
+			 * **O número e o nome são um identificador só**, na mesma linha e do mesmo tamanho, com o
+			 * número a bold. Há quem conheça a fonte pelo número e quem a conheça só pelo nome; o
+			 * nome não é legenda, é o segundo eixo de leitura e tem de se ler de longe.
+			 *
+			 * **Nunca se corta com reticências.** Sete fontes da base começam por "Continente Bom
+			 * Dia…" e o que as distingue está no fim — cortar aos 18 caracteres deixava 23 nomes
+			 * ambíguos. Quando não cabe, o que encolhe é o corpo da letra, e o nome vai inteiro.
+			 */
+			/* Fica na coluna 1, com a marca de estado ao lado — não em cima dela, que gastava uma linha. */
+			.identificador {
+				grid-column: 1;
+				font-size: var(--nome, 26px);
+				line-height: 1.15;
+				overflow-wrap: break-word;
+				align-self: start;
+			}
+
+			/*
+			 * O número a amarelo, no peso corrente.
+			 *
+			 * A bold, o número puxava o olho para si e o nome ficava a parecer legenda — e são os
+			 * dois o identificador. A cor separa-os sem os hierarquizar, e o amarelo sobre escuro
+			 * tem 11,7:1, que é o acento mais forte que a marca permite.
+			 */
+			.identificador b {
+				font-weight: inherit;
+				color: var(--marca-amarelo);
+			}
+
+			/*
+			 * Os degraus do nome, pelo comprimento. Medido na base: 75% cabem no tamanho de base,
+			 * 22% precisam de um degrau, 3% de dois. O último degrau existe para o caso que ainda não
+			 * apareceu — vale mais um nome pequeno do que um nome cortado.
+			 */
+			.identificador[data-longo='1'] {
+				font-size: calc(var(--nome, 26px) * 0.88);
+			}
+			.identificador[data-longo='2'] {
+				font-size: calc(var(--nome, 26px) * 0.78);
+			}
+			.identificador[data-longo='3'] {
+				font-size: calc(var(--nome, 26px) * 0.68);
+			}
+
+			.numero {
+				font-size: var(--numero, 64px);
+				font-weight: var(--peso-destaque);
+				line-height: 1;
+				white-space: nowrap;
+			}
+
+			/* Sem número não se inventa um: a família continua na grelha, com o lugar dela. */
+			.numero[data-sem-numero='sim'] {
+				color: var(--n-400);
+			}
+
+			.marca {
+				font-size: var(--numero, 64px);
+				line-height: 1;
+				color: var(--cor);
+			}
+
+			.marca::after {
+				content: var(--marca);
+			}
+
+			/*
+			 * **O peso ocupa o lugar do visto, e leva a cor do estado.**
+			 *
+			 * Não é uma segunda informação encostada ao ✓: é o ✓ substituído por um número. Quem
+			 * entregou 15 kg tem o cartão a dizer "15 kg" a verde, e quem entregou sem peso registado
+			 * continua a ter o visto — são 1,2% dos cartões, e para esses o glifo é a única resposta
+			 * que existe.
+			 *
+			 * **A distinção não é só de cor.** Um ✕ vermelho e um "15 kg" verde diferem em *forma*
+			 * antes de diferirem em cor, e por isso quem não distingue verde de vermelho continua a
+			 * ler o cartão. Era diferente se fossem dois números.
+			 *
+			 * Alinhado à direita e sem `wrap`: o número cresce para a esquerda e nunca parte em duas
+			 * linhas.
+			 *
+			 * **O corpo é o do número da família — 64px — e isso só serve nas entregas.** Ali a coluna
+			 * 1 tem quatro caracteres (`B412`) e sobra largura; nas recolhas tem o número **e o nome
+			 * da fonte**, que é o segundo eixo de leitura e chega aos 55 caracteres. Ver o degrau das
+			 * recolhas a seguir.
+			 */
+			.peso {
+				font-size: var(--numero, 64px);
+				font-weight: var(--peso-destaque);
+				line-height: 1;
+				color: var(--cor);
+				white-space: nowrap;
+				text-align: right;
+			}
+
+			/*
+			 * **Nas recolhas o peso é muito mais pequeno, e não é preferência — era um erro.**
+			 *
+			 * As densidades das recolhas nunca definem `--numero`: essa variável é o corpo do número
+			 * da família, das entregas. O `.peso` caía no valor por omissão de **64px**, e um número
+			 * desse tamanho na coluna 2 comia a largura da coluna 1 — o nome partia-se em três linhas
+			 * e a hora saía pelo fundo do cartão, que tem `max-height`. "125 kg" empurrava
+			 * "Pingo Doce Cova Piedade" para fora do seu próprio cartão.
+			 *
+			 * Prende-se ao `--nome`, que é a variável que escala com a densidade, e não a um número
+			 * fixo: a 26px de nome dá ~32px de peso — o mesmo corpo do total no cabeçalho — e nos
+			 * degraus apertados encolhe com o resto, sem outra tabela para manter.
+			 *
+			 * **Continua a ser o elemento mais forte do cartão**, porque é o único a bold e a cores;
+			 * deixa é de competir com o identificador, que ali é quem manda.
+			 */
+			.grelha[data-area='recolhas'] .peso {
+				font-size: calc(var(--nome, 26px) * 1.25);
+			}
+
+			/*
+			 * A unidade a 40% do corpo, e **proporcional em todos os degraus**.
+			 *
+			 * O que se lê a quatro metros é o número; a unidade serve para desfazer a dúvida de quem
+			 * está perto. Um chão em pixéis fazia-a crescer relativamente nos degraus apertados — 16px
+			 * ao lado de um número de 24px é a unidade a competir com o número, que é o contrário do
+			 * que se quer.
+			 *
+			 * **O que isto aceita:** no degrau mais cheio das recolhas a unidade fica com ~9px, e a
+			 * essa distância não se distingue `kg` de `T`. Um cartão em toneladas exige 1 000 kg numa
+			 * fonte, o que na base são **5 cartões em 6 092** — e nesses o número em si já é
+			 * inconfundível (`1,2` contra `125`). Se algum dia incomodar num ecrã real, o sítio de
+			 * mexer é aqui.
+			 */
+			.peso small {
+				font-size: 0.4em;
+				font-weight: var(--peso-corrente);
+				margin-left: 0.15em;
+			}
+
+			.detalhe {
+				grid-column: 1 / -1;
+				font-size: var(--detalhe, 32px);
+				color: var(--n-400);
+				display: flex;
+				gap: var(--e-4);
+				white-space: nowrap;
+			}
+
+			/* O travessão de "sem contagem". Cinzento para não se confundir com um número. */
+			.sem-contagem {
+				color: var(--n-600);
+			}
+
+			/*
+			 * ------------------------------------------------------------------ extras
+			 *
+			 * **Um extra não é um estado, e por isso não tem cor própria.**
+			 *
+			 * Um cartão de extra está *entregue* ou com *falta* como qualquer outro — o verde e o
+			 * vermelho continuam a querer dizer o mesmo, e trocá-los por uma terceira cor obrigava a
+			 * quem olha a aprender que ali o verde deixou de ser verde. O que muda é **o que ele não
+			 * tem**: um extra não estava na escala do dia, portanto não tem hora combinada.
+			 *
+			 * Essa ausência sozinha não chegava. Um cartão sem hora já existe por outra razão —
+			 * horário por preencher, 19 rotas de recolha da base —, e os dois liam-se igual. Por isso
+			 * a palavra ocupa o lugar da hora: diz o que o cartão é, no sítio exacto onde a diferença
+			 * está, e não gasta uma linha nova num ecrã que não tem linhas a mais.
+			 *
+			 * O amarelo é o acento da marca sobre escuro, o mesmo do número das recolhas. A borda
+			 * ponteada repete a mesma coisa em forma, para quem não distinga a cor.
+			 */
+			.cartao[data-extra='sim'] {
+				border-left-style: dotted;
+			}
+
+			.extra {
+				color: var(--marca-amarelo);
+				font-weight: var(--peso-destaque);
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+			}
+
+			/* ----------------------------------------------------------- notas (PWA) */
+
+			/*
+			 * As notas são uma **faixa no rodapé**, e não uma coluna.
+			 *
+			 * Como coluna custavam 300px de largura — que a 90 famílias são duas colunas de cartões,
+			 * ou seja dezoito famílias fora do ecrã. No rodapé custam 56px de altura, e altura é o
+			 * que menos falta faz: no degrau mais cheio sobram uns pixéis, na largura não sobra nada.
+			 *
+			 * **A faixa só existe quando há notas.** Sem elas não ocupa nada e a grelha fica com o
+			 * ecrã inteiro, que é o estado de hoje.
+			 *
+			 * O texto rola da direita para a esquerda, como nos rodapés dos canais de notícias: é a
+			 * forma de caber texto de comprimento imprevisível numa altura fixa sem o encolher nem o
+			 * cortar. A duração da volta é proporcional ao comprimento, para a velocidade de leitura
+			 * ser sempre a mesma — e é escrita pelo JavaScript numa variável, não fixada aqui.
+			 */
+			.rodape {
+				border-top: 2px solid var(--n-800);
+				height: 48px;
+				display: flex;
+				align-items: center;
+				gap: var(--e-8);
+				overflow: hidden;
+			}
+
+			/*
+			 * A legenda do comando. Discreta: é referência, não é conteúdo — quem está a trabalhar
+			 * olha para os cartões, e só olha para aqui na primeira vez que pega no comando.
+			 */
+			/*
+			 * A legenda tem um limite à direita, e não é enfeite.
+			 *
+			 * Sem ele, a última palavra da legenda encostava ao início das notas e lia-se como o
+			 * princípio de uma nota — aconteceu a quem olhou para o ecrã pela primeira vez. São duas
+			 * coisas de natureza diferente: uma é referência fixa, a outra é conteúdo que muda.
+			 */
+			.comandos {
+				flex: none;
+				display: flex;
+				align-items: center;
+				gap: var(--e-6);
+				padding-right: var(--e-8);
+				border-right: 2px solid var(--n-800);
+				font-size: 22px;
+				color: var(--n-600);
+				white-space: nowrap;
+				user-select: none;
+			}
+
+			.comando {
+				display: flex;
+				align-items: center;
+				gap: var(--e-2);
+				cursor: pointer;
+			}
+
+			.comando i {
+				font-style: normal;
+				color: var(--n-400);
+				border: 1px solid var(--n-800);
+				border-radius: 4px;
+				padding: 1px 8px;
+			}
+
+			/* O que ainda não existe diz que ainda não existe, em vez de abrir um ecrã vazio. */
+			.por-vir {
+				opacity: 0.55;
+				cursor: default;
+			}
+
+			/* Entre parênteses, para não se ler como a continuação da frase nem como uma nota. */
+			.por-vir em {
+				font-style: normal;
+				font-size: 18px;
+			}
+
+			.por-vir em::before {
+				content: '(';
+			}
+
+			.por-vir em::after {
+				content: ')';
+			}
+
+			.rodape-etiqueta {
+				flex: none;
+				font-size: 24px;
+				font-weight: var(--peso-enfase);
+				color: var(--marca-preto);
+				background: var(--marca-amarelo); /* sobre amarelo o texto é preto, nunca branco */
+				padding: var(--e-1) var(--e-3);
+				border-radius: 4px;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+			}
+
+			.rodape-janela {
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				align-items: center;
+				gap: var(--e-4);
+				overflow: hidden;
+			}
+
+			/*
+			 * O carrossel tem o conteúdo **duas vezes** e desliza meia largura: quando a primeira
+			 * cópia sai à esquerda, a segunda está exactamente onde a primeira começou, e a volta
+			 * não tem costura nem salto.
+			 */
+			.rodape-fita {
+				display: flex;
+				width: max-content;
+				gap: var(--e-16);
+				font-size: 28px;
+				white-space: nowrap;
+				animation: rolar var(--duracao, 40s) linear infinite;
+			}
+
+			.rodape-fita > span {
+				display: flex;
+				gap: var(--e-16);
+			}
+
+			@keyframes rolar {
+				from {
+					transform: translateX(0);
+				}
+				to {
+					transform: translateX(-50%);
+				}
+			}
+
+			/*
+			 * Movimento é uma escolha de acessibilidade, não um efeito. Quem tiver o sistema a pedir
+			 * menos movimento vê a fita parada, e lê-a como uma linha normal.
+			 */
+			@media (prefers-reduced-motion: reduce) {
+				.rodape-fita {
+					animation: none;
+				}
+			}
+
+			/* ------------------------------------------------------------------ avisos */
+
+			.aviso {
+				font-size: 40px;
+				color: var(--erro-claro);
+				padding: var(--e-6) 0;
+			}
+
+			.vazio {
+				font-size: 40px;
+				color: var(--n-400);
+				padding: var(--e-12) 0;
+			}
+
+			[hidden] {
+				display: none !important;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<img class="logotipo" src="/img/refood_simbolo_fundo_escuro.svg" width="169" height="218" alt="Refood" />
+
+			<div class="dia-controlo">
+				<span class="seta" id="dia-anterior">‹</span>
+				<span class="dia" id="dia">—</span>
+				<span class="relacao" id="relacao"></span>
+				<span class="seta" id="dia-seguinte">›</span>
+			</div>
+			<div class="identidade">
+				<span class="nucleo" id="nucleo"></span>
+				<span class="turno-nome" id="turno-nome"></span>
+			</div>
+			<div class="turno-controlo" id="turno-controlo">
+				<span class="seta" id="turno-anterior">▲</span>
+				<span class="turno-etiqueta">turno</span>
+				<span class="turno-hora" id="turno-hora">—</span>
+				<span class="turno-pontos" id="turno-pontos"></span>
+				<span class="seta" id="turno-seguinte">▼</span>
+			</div>
+
+			<div class="contagens" id="contagens" hidden>
+				<span><b id="conta-total">0</b> <span id="conta-total-rotulo">famílias</span></span>
+				<span><b id="conta-feitas">0</b> <span id="conta-feitas-rotulo">entregues</span></span>
+				<span id="conta-faltas-grupo"><b id="conta-faltas">0</b> faltas</span>
+				<span class="extras" id="conta-extras-grupo" hidden><b id="conta-extras">0</b> <span id="conta-extras-rotulo">extra</span></span>
+				<span class="peso-total" id="peso-total-grupo" hidden><b id="peso-total">0</b></span>
+				<span class="fora-de-escala" id="fora-de-escala-grupo" hidden><b id="fora-de-escala">0</b> fora de escala</span>
+				<span class="por-identificar" id="por-identificar-grupo" hidden><b id="por-identificar">0</b> por identificar</span>
+			</div>
+		</header>
+
+		<div class="corpo">
+			<div>
+				<div class="grelha" id="grelha" data-densidade="normal"></div>
+				<p class="vazio" id="vazio" hidden>Sem entregas neste turno.</p>
+				<p class="aviso" id="aviso" role="status" aria-live="polite" hidden></p>
+			</div>
+		</div>
+
+		<!-- Só aparece quando houver notas. Sem elas, a grelha fica com o ecrã inteiro. -->
+		<!--
+			O rodapé tem sempre os comandos e, quando houver, as notas a rolar à direita.
+
+			Os comandos são a legenda do mapeamento: quem entra na cozinha e pega no comando vê ali
+			o que cada seta faz, sem ninguém lhe explicar. É discreto de propósito — é referência,
+			não é o conteúdo.
+		-->
+		<footer class="rodape">
+			<div class="comandos">
+				<span class="comando"><i>‹ ›</i> dia</span>
+				<span class="comando"><i>▲ ▼</i> turno</span>
+				<span class="comando" id="comando-area"><i>OK</i> recolhas</span>
+			</div>
+			<div class="rodape-janela" id="rodape-notas" hidden>
+				<span class="rodape-etiqueta">Notas</span>
+				<div class="rodape-fita" id="rodape-fita"></div>
+			</div>
+			<!--
+				O relógio veio parar aqui, e não ao cabeçalho: lá ficava encostado à hora do turno,
+				e dois relógios lado a lado sem etiqueta não se distinguem — quem olha não sabe qual
+				é "agora" e qual é "o turno que estou a ver".
+			-->
+			<span class="agora" id="agora">--:--</span>
+		</footer>
+
+		<script>
+			/*
+			 * O painel do lado do ecrã.
+			 *
+			 * **Nada muda sozinho, nunca** — a não ser os dados do turno que está a ser mostrado.
+			 * A distinção é o desenho todo: o dia e o turno ficam onde a pessoa os deixou, porque
+			 * estar em "amanhã" é o estado de trabalho de quem está a preparar, e um ecrã que
+			 * voltasse a hoje ao fim de uns minutos apagava esse trabalho. Os estados dos cartões,
+			 * esses, têm de acompanhar o turno a decorrer, senão o ecrã está a mentir.
+			 *
+			 * Um só temporizador, como no ecrã de emparelhamento: uma TV fica ligada semanas
+			 * seguidas, e dois ciclos a arrancarem-se um ao outro não dão erro nenhum — dão o dobro
+			 * dos pedidos, e depois o quádruplo.
+			 */
+
+			const TOKEN = 'refood.tv.token';
+			/*
+			 * De quanto em quanto tempo o painel volta a pedir os dados.
+			 *
+			 * Sessenta segundos e não trinta: o que muda durante um turno é o estado do POS, e uma
+			 * família servida aparecer até um minuto depois não muda nada para quem está na cozinha.
+			 * Trinta segundos custavam o dobro das idas ao Odoo — 65 ecrãs, cinco horas por dia,
+			 * numa base on-premise — sem ninguém ver a diferença.
+			 *
+			 * **Isto pede só o painel que está no ecrã.** Quando as Recolhas existirem, o painel
+			 * escondido não refresca: alternar com o OK é que o vai buscar.
+			 */
+			const ACTUALIZACAO_MS = 60_000;
+			const RECUO_MS = 60_000;
+
+			/** Onde o ecrã está. Só muda por acção de quem carrega numa seta. */
+			let dia = null;
+			let turno = null;
+
+			/** Os turnos do dia que está no ecrã, para as setas de cima e de baixo saberem por onde andar. */
+			let turnosDoDia = [];
+
+			let proximaLeitura = 0;
+			let aPedir = false;
+
+			const el = (id) => document.getElementById(id);
+
+			function avisar(texto) {
+				el('aviso').textContent = texto ?? '';
+				el('aviso').hidden = !texto;
+			}
+
+			async function pedir(caminho) {
+				const token = localStorage.getItem(TOKEN);
+				if (!token) return { estado: 'sem_token' };
+
+				let resposta;
+				try {
+					resposta = await fetch(caminho, { headers: { authorization: `Bearer ${token}` } });
+				} catch {
+					return { estado: 'sem_rede' };
+				}
+
+				// Um 401 é o caminho de volta ao emparelhamento: o token foi revogado na sede, e
+				// insistir com ele só atrasa o ecrã a voltar a funcionar.
+				if (resposta.status === 401) {
+					localStorage.removeItem(TOKEN);
+					location.href = '/';
+					return { estado: 'revogado' };
+				}
+
+				if (!resposta.ok) return { estado: 'erro' };
+				return { estado: 'ok', corpo: await resposta.json().catch(() => null) };
+			}
+
+			/**
+			 * A densidade sai da contagem, e os degraus são diferentes nas duas áreas.
+			 *
+			 * Nas entregas o que aperta são 90 cartões estreitos; nas recolhas são 30 cartões largos,
+			 * porque cada um leva o nome da fonte. Nenhum degrau esconde nada, em nenhuma das duas.
+			 */
+			/** Uma tecla desenhada na legenda do rodapé. */
+			function criarTecla(texto) {
+				const i = document.createElement('i');
+				i.textContent = texto;
+				return i;
+			}
+
+			function densidade(quantos, area) {
+				const cortes = area === 'recolhas' ? [12, 30, 42] : [15, 42, 72];
+				if (quantos <= cortes[0]) return 'folgada';
+				if (quantos <= cortes[1]) return 'normal';
+				if (quantos <= cortes[2]) return 'apertada';
+				return 'cheia';
+			}
+
+			/**
+			 * Que degrau de tamanho o nome precisa, pelo comprimento.
+			 *
+			 * O nome nunca se corta — sete fontes da base começam por "Continente Bom Dia…" e o que
+			 * as distingue está no fim. O que cede é o corpo da letra. Os cortes vêm da medição: 75%
+			 * dos nomes cabem no tamanho de base, 22% precisam de um degrau, 3% de dois.
+			 */
+			function degrauDoNome(texto) {
+				const n = texto.length;
+				// Uma palavra comprida não quebra, e ocupa uma linha quase sozinha —
+				// "ACTIVIDADES HOTELEIRAS" gasta mais espaço do que o número de caracteres sugere.
+				const maiorPalavra = Math.max(...texto.split(/\s+/).map((p) => p.length));
+				const degrau = (n > 60 ? 3 : n > 45 ? 2 : n > 30 ? 1 : 0) + (maiorPalavra > 12 ? 1 : 0);
+
+				return String(Math.min(3, degrau));
+			}
+
+			/**
+			 * As pessoas do agregado, no menor número de caracteres que ainda diz a coisa certa.
+			 *
+			 * **O total é a soma dos dois**, portanto escrevê-lo ao lado da decomposição era dizer o
+			 * mesmo duas vezes — e era o que fazia a linha não caber no cartão. Fica `2A 1C`: dois
+			 * adultos, uma criança. Quem separa comida numa cozinha precisa da decomposição, não do
+			 * total, porque é ela que diz o tamanho do saco.
+			 *
+			 * **O travessão é "não sabemos", não "zero".** Cerca de metade das rotas tem as contagens
+			 * a zero, que é "ninguém preencheu" e não "família de zero pessoas". Escrever *sem
+			 * contagem* por extenso era a linha mais comprida do ecrã, e é o caso mais frequente:
+			 * a dois metros de distância um travessão onde os outros cartões têm números lê-se como
+			 * ausência, que é exactamente o que é.
+			 */
+			function textoDasPessoas(cartao) {
+				const partes = [];
+				if (cartao.adultos !== null) partes.push(`${cartao.adultos}A`);
+				if (cartao.criancas !== null) partes.push(`${cartao.criancas}C`);
+				if (partes.length > 0) return partes.join(' ');
+
+				// Sem decomposição mas com total — não acontece nos dados de hoje, mas o total é um
+				// campo à parte e nada na base garante que os três andem juntos.
+				if (cartao.pessoas !== null) return `${cartao.pessoas}P`;
+
+				return null;
+			}
+
+			/**
+			 * O primeiro campo da linha de detalhe: **a hora, ou a palavra que a substitui**.
+			 *
+			 * Um extra não estava na escala do dia e por isso não tem hora combinada nenhuma. A
+			 * palavra ocupa o lugar dela porque é aí que está a diferença — e porque um cartão
+			 * simplesmente sem hora já existe por outra razão (horário por preencher) e leria igual.
+			 *
+			 * O `semHora` é o que as duas áreas fazem de diferente quando não há hora: as recolhas
+			 * põem um travessão, porque a hora é a ordem do trabalho e a falta dela é informação; as
+			 * entregas não põem nada, porque ali a hora é indicativa e um travessão a mais em metade
+			 * dos cartões é ruído. Devolve `null` quando não há nada a acrescentar.
+			 */
+			function marcaDaEscala(cartao, semHora) {
+				if (cartao.extra) {
+					const extra = document.createElement('span');
+					extra.className = 'extra';
+					extra.textContent = 'extra';
+					return extra;
+				}
+
+				if (cartao.hora === null && semHora === null) return null;
+
+				const hora = document.createElement('span');
+				hora.className = 'hora';
+				hora.textContent = cartao.hora ?? semHora;
+				return hora;
+			}
+
+			/**
+			 * A faixa de notas do rodapé.
+			 *
+			 * O conteúdo entra **duas vezes** para a volta não ter costura, e a duração sai do
+			 * comprimento do texto — a ~14 caracteres por segundo, que é uma velocidade de leitura
+			 * confortável para quem está a três metros e a fazer outra coisa ao mesmo tempo.
+			 *
+			 * `textContent` e nunca `innerHTML`: isto é texto escrito por pessoas, e o dia em que
+			 * passar a vir do Odoo ou do D1 não pode haver aqui um caminho para injectar marcação.
+			 */
+			function desenharNotas(notas) {
+				const janela = el('rodape-notas');
+				janela.hidden = notas.length === 0;
+				if (notas.length === 0) return;
+
+				const fita = el('rodape-fita');
+				fita.replaceChildren();
+
+				const comprimento = notas.join('').length;
+				fita.style.setProperty('--duracao', `${Math.max(20, Math.round((comprimento * 2) / 14))}s`);
+
+				// Duas cópias: quando a primeira sai, a segunda está onde a primeira começou.
+				for (let copia = 0; copia < 2; copia++) {
+					const bloco = document.createElement('span');
+					// A segunda cópia é decoração: quem usa leitor de ecrã ouve a lista uma vez.
+					if (copia === 1) bloco.setAttribute('aria-hidden', 'true');
+
+					for (const nota of notas) {
+						const item = document.createElement('span');
+						item.textContent = nota;
+						bloco.append(item);
+					}
+					fita.append(bloco);
+				}
+			}
+
+			/**
+			 * O cartão de uma família: número em grande, hora e composição do agregado por baixo.
+			 *
+			 * **Num parceiro de apoio o nome ocupa o lugar do agregado.** Um parceiro não tem
+			 * adultos nem crianças — é uma instituição —, e o espaço estava a mais; o que ali falta
+			 * é o que o distingue de outro parceiro, que é o nome. Ver `nomeCurtoDoParceiro`, em
+			 * `entregas.ts`: chegam duas palavras, e é o servidor que as corta.
+			 *
+			 * **Construído por nós e não por `innerHTML`.** Passou a entrar aqui texto vindo do
+			 * Odoo, e um nome com `&` ou `<` interpolado numa string de marcação é uma porta que não
+			 * tem de existir.
+			 */
+			function cartaoDeEntrega(cartao) {
+				const numero = document.createElement('span');
+				numero.className = 'numero';
+				numero.textContent = cartao.etiqueta ?? '—';
+				if (cartao.etiqueta === null) numero.dataset.semNumero = 'sim';
+
+				const detalhe = document.createElement('span');
+				detalhe.className = 'detalhe';
+
+				const escala = marcaDaEscala(cartao, null);
+				if (escala) detalhe.append(escala);
+
+				const segundo = document.createElement('span');
+				const pessoas = textoDasPessoas(cartao);
+				if (cartao.nome) {
+					segundo.textContent = cartao.nome;
+				} else if (pessoas !== null) {
+					segundo.textContent = pessoas;
+				} else {
+					// O travessão de "sem contagem", cinzento para não se confundir com um número.
+					segundo.className = 'sem-contagem';
+					segundo.textContent = '—';
+				}
+				detalhe.append(segundo);
+
+				return [numero, marcaDeEstado(cartao), detalhe];
+			}
+
+			/**
+			 * O cartão de uma fonte: número e nome numa linha só, hora por baixo.
+			 *
+			 * **A nota da rota não vem** — o servidor nem sequer a lê. Ver `recolhas.ts`.
+			 *
+			 * O nome entra por `textContent` — é texto do Odoo e há nomes com `&` lá dentro. O
+			 * `<b>` do número é construído, não interpolado.
+			 */
+			function cartaoDeRecolha(cartao) {
+				const identificador = document.createElement('span');
+				identificador.className = 'identificador';
+
+				const numero = document.createElement('b');
+				numero.textContent = cartao.etiqueta ?? '—';
+				identificador.append(numero);
+
+				if (cartao.nome) {
+					identificador.append(document.createTextNode(` ${cartao.nome}`));
+					identificador.dataset.longo = degrauDoNome(`${cartao.etiqueta ?? ''} ${cartao.nome}`);
+				}
+
+				const detalhe = document.createElement('span');
+				detalhe.className = 'detalhe';
+				detalhe.append(marcaDaEscala(cartao, '—'));
+
+				return [identificador, marcaDeEstado(cartao), detalhe];
+			}
+
+			/**
+			 * A coluna da direita do cartão: **o peso, quando existe; o símbolo do estado, quando não.**
+			 *
+			 * É a mesma célula da grelha nos dois casos — trocar um glifo por um número não mexe no
+			 * layout. O peso vem formatado do servidor (`'15 kg'`, `'1,2 T'`) porque o arredondamento
+			 * tem de ser feito uma vez só: é a soma destes valores que dá o total do cabeçalho.
+			 *
+			 * **Sem peso não se inventa um zero.** Um cartão fica com o ✓ quando a entrega não tem
+			 * peso registado — cabaz em unidades, peso por introduzir —, quando tem falta, ou quando o
+			 * valor ficou fora de escala. São casos diferentes com a mesma resposta no ecrã, e o
+			 * servidor já os resolveu: aqui só há `peso` ou não há.
+			 */
+			function marcaDeEstado(cartao) {
+				if (cartao.peso) {
+					const peso = document.createElement('span');
+					peso.className = 'peso';
+
+					// O número e a unidade em elementos separados: o `textContent` é o que evita
+					// interpolar HTML com um valor que vem do servidor.
+					const partes = cartao.peso.split(' ');
+					peso.textContent = partes[0];
+
+					const unidade = document.createElement('small');
+					unidade.textContent = partes.slice(1).join(' ');
+					peso.append(unidade);
+
+					peso.setAttribute('role', 'img');
+					peso.setAttribute('aria-label', `${cartao.estado.replace('_', ' ')}, ${cartao.peso}`);
+					return peso;
+				}
+
+				const marca = document.createElement('span');
+				marca.className = 'marca';
+				// O símbolo vem do CSS, mas o significado tem de existir para quem não o vê.
+				marca.setAttribute('role', 'img');
+				marca.setAttribute('aria-label', cartao.estado.replace('_', ' '));
+				return marca;
+			}
+
+			function desenharGrelha(painel) {
+				const grelha = el('grelha');
+				grelha.dataset.area = area;
+				grelha.dataset.densidade = densidade(painel.cartoes.length, area);
+				grelha.replaceChildren();
+
+				for (const cartao of painel.cartoes) {
+					const div = document.createElement('div');
+					div.className = 'cartao';
+					// O estado viaja como dado e não como classe: um estado novo não precisa de
+					// nenhuma linha nova aqui, só de um bloco de CSS.
+					div.dataset.estado = cartao.estado;
+					// E o extra viaja **ao lado** do estado, e não dentro dele: um extra está
+					// entregue ou com falta como qualquer outro cartão. Ver o CSS.
+					if (cartao.extra) div.dataset.extra = 'sim';
+					div.append(...(area === 'recolhas' ? cartaoDeRecolha(cartao) : cartaoDeEntrega(cartao)));
+					grelha.append(div);
+				}
+
+				el('vazio').hidden = painel.cartoes.length > 0;
+			}
+
+			function desenharCabecalho(painel) {
+				el('dia').textContent = painel.nomeDoDia;
+				el('relacao').textContent = painel.relacao;
+
+				el('dia-anterior').dataset.inativa = painel.podeRecuar ? 'nao' : 'sim';
+				el('dia-seguinte').dataset.inativa = painel.podeAvancar ? 'nao' : 'sim';
+
+				/*
+				 * As contagens.
+				 *
+				 * **As faltas passaram a existir nas duas áreas.** Este bloco escondia o contador de
+				 * faltas nas recolhas, porque "uma fonte sem excedentes não é falta de ninguém" — e
+				 * isso continua a ser verdade, mas o "sem excedente" tem produto próprio e conta como
+				 * tratado. Faltas nas recolhas há: 25 na base, desde 2024-10-31.
+				 *
+				 * **O peso é dois números com o número de entregas, nunca um só.** 112 entregas da
+				 * base trazem quilos *e* um cabaz registado em unidades, e nessas o total subestima
+				 * sem cura possível — um cabaz não é exprimível em quilos. Somar as duas coisas numa
+				 * linha era inventar uma equivalência que não existe.
+				 */
+				const recolhas = area === 'recolhas';
+
+				// **As três primeiras contam a escala, e só a escala.** Os extras não estavam
+				// previstos: somá-los ao total fazia o denominador mexer-se durante o turno, e quem
+				// olha para o ecrã lê estas contagens para saber quanto falta fazer. Vão à parte,
+				// no contador amarelo a seguir. Ver o CSS.
+				const previstos = painel.cartoes.filter((c) => !c.extra);
+				el('conta-total').textContent = previstos.length;
+				el('conta-total-rotulo').textContent = recolhas ? 'fontes' : 'famílias';
+				el('conta-feitas').textContent = previstos.filter((c) => c.estado === (recolhas ? 'recolhido' : 'entregue')).length;
+				el('conta-feitas-rotulo').textContent = recolhas ? 'recolhidas' : 'entregues';
+				el('conta-faltas-grupo').hidden = false;
+				el('conta-faltas').textContent = previstos.filter((c) => c.estado === 'falta').length;
+
+				const extras = painel.cartoes.length - previstos.length;
+				el('conta-extras-grupo').hidden = extras === 0;
+				el('conta-extras').textContent = extras;
+				el('conta-extras-rotulo').textContent = extras === 1 ? 'extra' : 'extras';
+
+				el('peso-total-grupo').hidden = !painel.pesoTotal;
+				el('peso-total').textContent = painel.pesoTotal ?? '';
+
+				el('fora-de-escala-grupo').hidden = !painel.foraDeEscala;
+				el('fora-de-escala').textContent = painel.foraDeEscala ?? 0;
+
+				el('por-identificar-grupo').hidden = !painel.porIdentificar;
+				el('por-identificar').textContent = painel.porIdentificar ?? 0;
+
+				el('contagens').hidden = painel.cartoes.length === 0;
+
+				el('vazio').textContent = AREAS[area].vazio;
+				el('comando-area').replaceChildren(criarTecla('OK'), document.createTextNode(` ${AREAS[area].outra}`));
+
+				/*
+				 * O turno: a hora actual entre as duas setas, e os pontos a dizer em qual se está.
+				 *
+				 * Não é a lista dos turnos — ver a nota no CSS. Com um turno só, as setas e os
+				 * pontos ficam invisíveis mas o espaço mantém-se, para o cabeçalho não saltar quando
+				 * se muda para um dia que tenha dois.
+				 */
+				const controlo = el('turno-controlo');
+				controlo.dataset.unico = painel.turnos.length > 1 ? 'nao' : 'sim';
+				el('turno-hora').textContent = painel.turno ? (painel.turno.hora ?? painel.turno.nome) : '—';
+				// O nome vai por baixo do núcleo: a hora sozinha não distingue dois turnos que
+				// comecem à mesma hora, e há-os.
+				el('turno-nome').textContent = painel.turno ? painel.turno.nome : '';
+
+				const pontos = el('turno-pontos');
+				pontos.replaceChildren();
+				for (const opcao of painel.turnos) {
+					const ponto = document.createElement('i');
+					if (opcao.id === painel.turno?.id) ponto.dataset.actual = 'sim';
+					pontos.append(ponto);
+				}
+
+				// As setas do turno só valem quando há mais do que um; o CSS esconde-as, e aqui
+				// marcam-se para o rato também não as tratar como clicáveis.
+				const noLimite = (indice) => painel.turnos.findIndex((t) => t.id === painel.turno?.id) === indice;
+				el('turno-anterior').dataset.inativa = painel.turnos.length > 1 && !noLimite(0) ? 'nao' : 'sim';
+				el('turno-seguinte').dataset.inativa = painel.turnos.length > 1 && !noLimite(painel.turnos.length - 1) ? 'nao' : 'sim';
+			}
+
+			async function carregar() {
+				if (aPedir) return;
+				aPedir = true;
+				proximaLeitura = Date.now() + ACTUALIZACAO_MS;
+
+				try {
+					const parametros = new URLSearchParams();
+					if (dia !== null) parametros.set('dia', dia);
+					if (turno !== null) parametros.set('turno', turno);
+
+					const resposta = await pedir(`${AREAS[area].caminho}?${parametros}`);
+					if (resposta.estado === 'sem_token') return void (location.href = '/');
+					if (resposta.estado === 'revogado') return;
+
+					if (resposta.estado !== 'ok' || !resposta.corpo?.painel) {
+						// O ecrã fica com o que já tinha. Uma grelha velha é melhor do que uma
+						// grelha vazia: quem está na cozinha continua a ter por onde se guiar.
+						avisar(resposta.estado === 'sem_rede' ? 'Sem ligação à rede.' : 'Sem resposta do servidor.');
+						proximaLeitura = Date.now() + RECUO_MS;
+						return;
+					}
+
+					avisar(null);
+					const painel = resposta.corpo.painel;
+
+					// O servidor é quem manda no dia e no turno efectivos — corrige um dia fora da
+					// janela ou um turno que não existe naquele dia.
+					dia = painel.dia;
+					turno = painel.turno?.id ?? null;
+					turnosDoDia = painel.turnos;
+
+					desenharCabecalho(painel);
+					desenharGrelha(painel);
+					desenharNotas(painel.notas ?? []);
+				} finally {
+					aPedir = false;
+				}
+			}
+
+			async function mostrarNucleo() {
+				const resposta = await pedir('/api/nucleo');
+				if (resposta.estado === 'ok' && resposta.corpo?.nucleo?.nome) {
+					el('nucleo').textContent = resposta.corpo.nucleo.nome;
+				}
+			}
+
+			/**
+			 * Mudar de dia **mantém a lógica do turno**: o pedido segue com o turno actual, e o
+			 * servidor cai no primeiro turno do dia novo se aquele lá não existir.
+			 */
+			function mudarDia(quantos) {
+				if (dia === null) return;
+				const [ano, mes, d] = dia.split('-').map(Number);
+				const novo = new Date(Date.UTC(ano, mes - 1, d + quantos));
+				dia = `${novo.getUTCFullYear()}-${String(novo.getUTCMonth() + 1).padStart(2, '0')}-${String(novo.getUTCDate()).padStart(2, '0')}`;
+				carregar();
+			}
+
+			/**
+			 * Muda de turno, dentro dos turnos do dia que está a ser mostrado.
+			 *
+			 * Não dá a volta ao fim da lista de propósito: numa TV, uma seta que não faz nada diz
+			 * "chegaste ao fim" sem ambiguidade, e uma que salta do último para o primeiro deixa
+			 * quem olha sem saber se andou ou recuou.
+			 */
+			function mudarTurno(quantos) {
+				if (turnosDoDia.length < 2) return;
+
+				const actual = turnosDoDia.findIndex((t) => t.id === turno);
+				const seguinte = Math.min(turnosDoDia.length - 1, Math.max(0, (actual === -1 ? 0 : actual) + quantos));
+				if (seguinte === actual) return;
+
+				turno = turnosDoDia[seguinte].id;
+				carregar();
+			}
+
+			/**
+			 * O gancho para alternar entre Entregas (BF) e Recolhas (FA).
+			 *
+			 * **As Recolhas ainda não existem**, e por isso isto não faz nada — mas o estado, a
+			 * tecla e o rodapé já estão no sítio, para o dia em que existirem ser uma rota nova e
+			 * não uma reforma da interação. Enquanto não houver, o rodapé diz que está por vir em
+			 * vez de mostrar um ecrã vazio.
+			 */
+			/**
+			 * As duas áreas do painel, e o que cada uma pede ao servidor.
+			 *
+			 * O OK do comando alterna entre elas, e **só a que está no ecrã é que refresca**: a outra
+			 * não faz pedido nenhum enquanto estiver escondida. Com 65 ecrãs a bater numa base
+			 * on-premise, dois painéis a actualizarem-se em paralelo seriam o dobro da carga para
+			 * mostrar metade.
+			 */
+			const AREAS = {
+				entregas: { caminho: '/api/entregas', outra: 'recolhas', vazio: 'Sem entregas neste turno.' },
+				recolhas: { caminho: '/api/recolhas', outra: 'entregas', vazio: 'Sem recolhas neste turno.' },
+			};
+
+			let area = 'entregas';
+
+			function alternarArea() {
+				area = AREAS[area].outra;
+				// O turno é do dia e da área: o mesmo dia pode ter turnos diferentes nas duas, e um
+				// id de turno de entregas não quer dizer nada nas recolhas. O servidor cai no
+				// primeiro turno quando não reconhece o que lhe mandam.
+				turno = null;
+				carregar();
+			}
+
+			/*
+			 * **A navegação é toda por teclado, e nada neste ecrã é focável.**
+			 *
+			 * O browser de uma Android TV usa as setas do comando para mover o foco entre elementos
+			 * clicáveis. Com um `<button>` no ecrã, cada seta fazia duas coisas: a nossa navegação e
+			 * o salto de foco do browser. Por isso os controlos são `<div>` — que não entram na
+			 * navegação por foco — e quem ouve as teclas é a janela, na fase de captura.
+			 *
+			 * O `preventDefault` não é zelo: sem ele, a seta que já tratámos ainda ia rolar a página
+			 * ou mover o foco por baixo de nós.
+			 *
+			 * O `repeat` é ignorado porque uma seta ficada premida no comando dispara dezenas de
+			 * vezes por segundo, e cada uma destas acções faz um pedido ao servidor.
+			 */
+			addEventListener(
+				'keydown',
+				(evento) => {
+					if (evento.repeat || evento.altKey || evento.ctrlKey || evento.metaKey) return;
+
+					// O OK do comando chega como `Enter` na maioria das boxes, mas há WebViews antigas
+					// onde vem como `KEYCODE_DPAD_CENTER` (23) sem `key` reconhecido.
+					const ok = evento.key === 'Enter' || evento.keyCode === 13 || evento.keyCode === 23;
+
+					const accao =
+						evento.key === 'ArrowLeft'
+							? () => mudarDia(-1)
+							: evento.key === 'ArrowRight'
+								? () => mudarDia(1)
+								: evento.key === 'ArrowUp'
+									? () => mudarTurno(-1)
+									: evento.key === 'ArrowDown'
+										? () => mudarTurno(1)
+										: ok
+											? () => alternarArea()
+											: null;
+
+					if (!accao) return;
+
+					evento.preventDefault();
+					accao();
+				},
+				{ capture: true },
+			);
+
+			// O rato continua a funcionar, para se poder testar num PC. É o acessório, não o caminho:
+			// na cozinha não há rato nenhum.
+			el('dia-anterior').addEventListener('click', () => mudarDia(-1));
+			el('dia-seguinte').addEventListener('click', () => mudarDia(1));
+			el('turno-anterior').addEventListener('click', () => mudarTurno(-1));
+			el('turno-seguinte').addEventListener('click', () => mudarTurno(1));
+			el('comando-area').addEventListener('click', () => alternarArea());
+
+			/*
+			 * O relógio, no fuso de Lisboa e não no do televisor.
+			 *
+			 * Uma box de cozinha arranca sozinha e pode nem ter fuso configurado; o `Intl` com o
+			 * fuso escrito à mão dá a hora certa mesmo quando o relógio do aparelho está em UTC.
+			 * É a mesma decisão do dia Refood, do lado do Worker.
+			 */
+			const RELOGIO = new Intl.DateTimeFormat('pt-PT', { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit', hour12: false });
+
+			function mostrarHoras() {
+				el('agora').textContent = RELOGIO.format(new Date());
+			}
+
+			/** Um tique por segundo, um pedido de trinta em trinta. Nada disto mexe no dia nem no turno. */
+			function ciclo() {
+				mostrarHoras();
+				if (Date.now() >= proximaLeitura) carregar();
+				setTimeout(ciclo, 1000);
+			}
+
+			mostrarNucleo();
+			carregar();
+			ciclo();
+		</script>
+	</body>
+</html>

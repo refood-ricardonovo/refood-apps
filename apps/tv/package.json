@@ -7,12 +7,15 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"cf-typegen": "wrangler types",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"devDependencies": {
 		"@types/node": "^26.4.0",
 		"typescript": "^5.5.2",
-		"wrangler": "^4.127.1"
+		"wrangler": "^4.127.1",
+		"vitest": "^4.1.11"
 	},
 	"dependencies": {
 		"@refood/odoo": "*"

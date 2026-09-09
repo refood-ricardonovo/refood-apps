@@ -1,57 +1,63 @@
-import { createOdooClient } from "@refood/odoo";
+import { rotaAdmin } from './admin';
+import { rotaEstadoEmparelhamento, rotaIniciarEmparelhamento, rotaRecolherToken } from './emparelhamento';
+import { rotaEntregas } from './entregas';
+import { rotaNucleo, rotaSinal } from './nucleo';
+import { rotaRecolhas } from './recolhas';
+import { servirRotaTv, type RotaTv } from './sessao';
+
+/** As rotas de emparelhamento, todas em POST: escrevem no D1 e não devem entrar em cache nenhuma. */
+const EMPARELHAMENTO: Record<string, (request: Request, env: Env) => Promise<Response>> = {
+	'/api/emparelhamento': rotaIniciarEmparelhamento,
+	'/api/emparelhamento/estado': rotaEstadoEmparelhamento,
+	'/api/emparelhamento/recolher': rotaRecolherToken,
+};
+
+/**
+ * As rotas de dados da TV, todas atrás do middleware.
+ *
+ * Passam pelo `servirRotaTv` e recebem um contexto sem `Request` e sem `Env` — não têm por onde ler
+ * um núcleo que não seja o do token. Uma rota nova entra nesta tabela e nasce com o âmbito fechado.
+ */
+const TV: Record<string, { metodo: string; rota: RotaTv }> = {
+	'/api/nucleo': { metodo: 'GET', rota: rotaNucleo },
+	'/api/sinal': { metodo: 'POST', rota: rotaSinal },
+	'/api/entregas': { metodo: 'GET', rota: rotaEntregas },
+	'/api/recolhas': { metodo: 'GET', rota: rotaRecolhas },
+};
+
+function metodoErrado(permitido: string): Response {
+	return Response.json({ ok: false, erro: 'metodo_nao_permitido' }, { status: 405, headers: { Allow: permitido } });
+}
 
 export default {
-  async fetch(request, env, ctx): Promise<Response> {
-    const url = new URL(request.url);
+	async fetch(request, env, ctx): Promise<Response> {
+		const url = new URL(request.url);
 
-    if (url.pathname === "/api/health") {
-      return Response.json({
-        ok: true,
-        agora: new Date().toISOString(),
-        odoo: env.ODOO_URL,
-      });
-    }
+		// Tudo o que está sob /api/admin/ entra pelo mesmo sítio, e esse sítio confere o segredo da
+		// sede antes de olhar para o caminho. Uma rota nova nasce protegida.
+		if (url.pathname.startsWith('/api/admin/')) {
+			return await rotaAdmin(request, env);
+		}
 
-    if (url.pathname === "/api/version") {
-      try {
-        const odoo = createOdooClient(env);
-        const versao = await odoo.version();
-        return Response.json({ ok: true, versao });
-      } catch (erro) {
-        return Response.json(
-          { ok: false, erro: erro instanceof Error ? erro.message : String(erro) },
-          { status: 502 }
-        );
-      }
-    }
+		const emparelhamento = EMPARELHAMENTO[url.pathname];
+		if (emparelhamento) {
+			if (request.method !== 'POST') return metodoErrado('POST');
+			return await emparelhamento(request, env);
+		}
 
-    if (url.pathname === "/api/teste") {
-      try {
-        const odoo = createOdooClient(env);
+		const tv = TV[url.pathname];
+		if (tv) {
+			if (request.method !== tv.metodo) return metodoErrado(tv.metodo);
+			// O sinal de vida vai para o `waitUntil`: escreve-se depois de a resposta seguir.
+			return await servirRotaTv(request, env, tv.rota, { aguardar: (promessa) => ctx.waitUntil(promessa) });
+		}
 
-        const uid = await odoo.authenticate();
+		// Saúde do Worker, e só isso: sem versões, sem endereços, sem nada que descreva o que está
+		// por trás. É o único ponto aberto, e é para poder ser chamado por uma sonda externa.
+		if (url.pathname === '/api/health') {
+			return Response.json({ ok: true, agora: new Date().toISOString() });
+		}
 
-        const utilizadores = await odoo.searchCount("res.users", [["active", "=", true]]);
-        const contactos = await odoo.searchCount("res.partner", [["active", "=", true]]);
-
-        const amostra = await odoo.searchRead<{ id: number; name: string; login: string }>(
-          "res.users",
-          [["active", "=", true]],
-          { fields: ["name", "login"], limit: 5, order: "id asc" }
-        );
-
-        return Response.json({ ok: true, uid, utilizadores, contactos, amostra });
-      } catch (erro) {
-        return Response.json(
-          {
-            ok: false,
-            tipo: erro instanceof Error ? erro.name : "Desconhecido",
-            erro: erro instanceof Error ? erro.message : String(erro),
-          },
-          { status: 502 }
-        );
-      }
-    }
-    return new Response("404 — rota de API inexistente", { status: 404 });
-  },
+		return new Response('404 — rota de API inexistente', { status: 404 });
+	},
 } satisfies ExportedHandler<Env>;

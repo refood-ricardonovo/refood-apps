@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="pt-PT">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Refood — ecrãs</title>
+		<link rel="icon" href="/img/favicon.ico" sizes="any" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<style>
+			/*
+			 * Página da sede. É usada num portátil, à secretária — não herda nada dos tamanhos da TV:
+			 * base 16px, alvos de toque de 44px, fundo claro.
+			 *
+			 * O amarelo aqui é fundo de cabeçalho e de acção primária, com texto preto por cima. Sobre
+			 * claro tem 1,8:1 e não serve para texto, em tamanho nenhum.
+			 */
+			* {
+				box-sizing: border-box;
+				margin: 0;
+			}
+
+			body {
+				background: var(--n-100);
+				color: #1a1a1a;
+				font-family: var(--fonte);
+				font-size: 16px;
+				line-height: 1.5;
+			}
+
+			/* O padding e o gap são --e-6 por causa da margem de proteção do logótipo — ver abaixo. */
+			header {
+				background: var(--marca-amarelo);
+				color: var(--marca-preto);
+				padding: var(--e-6);
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				gap: var(--e-6);
+				flex-wrap: wrap;
+			}
+
+			header h1 {
+				font-size: 20px;
+				font-weight: var(--peso-destaque);
+				display: flex;
+				align-items: center;
+				gap: var(--e-6);
+			}
+
+			/*
+			 * Logótipo do cabeçalho. 120px de largura: o mínimo do `design.md` para a horizontal na
+			 * PWA são 96px, e isto é a mesma família de ecrã — um portátil à secretária.
+			 *
+			 * Margem de proteção = altura do "F" de FOOD. No ficheiro o "F" mede 605px de 3028px de
+			 * largura, ou seja 19,98%; a 120px dá exactamente 24px, que é o `--e-6` do padding do
+			 * cabeçalho, do gap para o texto e do gap para os botões.
+			 */
+			header h1 img {
+				display: block;
+				width: 120px;
+				height: auto;
+			}
+
+			main {
+				max-width: 900px;
+				margin: 0 auto;
+				padding: var(--e-6) var(--e-4) var(--e-16);
+				display: flex;
+				flex-direction: column;
+				gap: var(--e-8);
+			}
+
+			section h2 {
+				font-size: 18px;
+				font-weight: var(--peso-enfase);
+				margin-bottom: var(--e-3);
+			}
+
+			/* O título à esquerda e a opção à direita, na mesma linha. */
+			.cabecalho-seccao {
+				display: flex;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: var(--e-4);
+				flex-wrap: wrap;
+			}
+
+			.opcao {
+				display: flex;
+				align-items: center;
+				gap: var(--e-2);
+				margin-bottom: var(--e-3);
+				color: var(--n-600);
+				cursor: pointer;
+				user-select: none;
+			}
+
+			.opcao input {
+				width: 18px;
+				height: 18px;
+				cursor: pointer;
+			}
+
+			.cartao {
+				background: var(--n-000);
+				border: 1px solid var(--n-200);
+				border-radius: 8px;
+				padding: var(--e-4);
+				display: flex;
+				gap: var(--e-4);
+				align-items: center;
+				flex-wrap: wrap;
+				justify-content: space-between;
+			}
+
+			.cartao + .cartao {
+				margin-top: var(--e-2);
+			}
+
+			.codigo {
+				font-size: 24px;
+				font-weight: var(--peso-destaque);
+				font-variant-numeric: tabular-nums;
+				letter-spacing: 0.06em;
+			}
+
+			.meta {
+				font-size: 14px;
+				color: var(--n-600);
+			}
+
+			.etiqueta {
+				font-weight: var(--peso-enfase);
+			}
+
+			.controlos {
+				display: flex;
+				gap: var(--e-2);
+				align-items: center;
+				flex-wrap: wrap;
+			}
+
+			button,
+			select,
+			input {
+				font: inherit;
+				min-height: 44px;
+				border-radius: 6px;
+				border: 1px solid var(--n-200);
+				padding: 0 var(--e-3);
+				background: var(--n-000);
+				color: inherit;
+			}
+
+			button {
+				cursor: pointer;
+				min-width: 44px;
+				font-weight: var(--peso-enfase);
+				transition:
+					background-color 120ms ease,
+					border-color 120ms ease,
+					color 120ms ease;
+			}
+
+			/*
+			 * **Um botão tem de responder ao rato.** Esta página é usada num portátil, à secretária,
+			 * e um dos botões apaga um ecrã de um núcleo — quem lá carrega tem de ver que está em
+			 * cima do botão certo antes de carregar.
+			 *
+			 * O sinal é sempre **fundo e limite ao mesmo tempo**, nunca só a cor: sobre o amarelo do
+			 * cabeçalho e sobre o branco de um cartão o mesmo tom lê-se de maneiras diferentes, e o
+			 * limite funciona nos dois.
+			 */
+			button:hover:not(:disabled),
+			select:hover:not(:disabled) {
+				background: var(--n-100);
+				border-color: var(--n-600);
+			}
+
+			button:active:not(:disabled) {
+				background: var(--n-200);
+			}
+
+			/*
+			 * O anel de foco existia só no painel da TV. Aqui há um `<select>` de núcleos que se
+			 * percorre pelo teclado, e sem anel não se via onde ia parar. Azul e não amarelo: sobre
+			 * fundo claro o amarelo da marca tem 1,8:1 e não se vê.
+			 */
+			button:focus-visible,
+			select:focus-visible,
+			input:focus-visible {
+				outline: 3px solid var(--info-escuro);
+				outline-offset: 2px;
+			}
+
+			button:disabled {
+				opacity: 0.5;
+				cursor: default;
+			}
+
+			.primaria {
+				background: var(--marca-amarelo);
+				border-color: var(--marca-amarelo);
+				color: var(--marca-preto);
+			}
+
+			/*
+			 * O amarelo escurece um pouco em vez de mudar de cor. É o estado de um controlo, não a
+			 * marca: o `#F5B72F` continua a ser o do repouso, que é o que se vê no ecrã parado.
+			 */
+			.primaria:hover:not(:disabled) {
+				background: color-mix(in srgb, var(--marca-amarelo) 88%, #000);
+				border-color: color-mix(in srgb, var(--marca-amarelo) 88%, #000);
+				color: var(--marca-preto);
+			}
+
+			.primaria:active:not(:disabled) {
+				background: color-mix(in srgb, var(--marca-amarelo) 78%, #000);
+			}
+
+			.perigo {
+				color: var(--erro-escuro);
+				border-color: var(--erro-escuro);
+				background: var(--n-000);
+			}
+
+			/*
+			 * O único botão destrutivo da página enche-se ao passar o rato, em vez de mudar de tom.
+			 * Revogar tira um televisor de serviço, e o aviso de que se está em cima dele deve ser
+			 * mais forte do que o dos outros. Branco sobre `--erro-escuro` são 5,9:1.
+			 */
+			.perigo:hover:not(:disabled) {
+				background: var(--erro-escuro);
+				border-color: var(--erro-escuro);
+				color: var(--n-000);
+			}
+
+			.perigo:active:not(:disabled) {
+				background: color-mix(in srgb, var(--erro-escuro) 85%, #000);
+			}
+
+			/* A opção também responde, senão parece que só a caixa é que se pode carregar. */
+			.opcao:hover {
+				color: #1a1a1a;
+			}
+
+			.revogado {
+				opacity: 0.6;
+			}
+
+			.estado-revogado {
+				color: var(--erro-escuro);
+				font-size: 14px;
+				font-weight: var(--peso-enfase);
+			}
+
+			#aviso {
+				color: var(--erro-escuro);
+				font-weight: var(--peso-enfase);
+			}
+
+			#entrada {
+				display: flex;
+				gap: var(--e-2);
+				flex-wrap: wrap;
+			}
+
+			.vazio {
+				color: var(--n-600);
+			}
+
+			[hidden] {
+				display: none !important;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1><img src="/img/refood_fundo_transparente.png" width="3028" height="728" alt="Refood" /><span>— ecrãs</span></h1>
+			<div class="controlos">
+				<button id="actualizar" hidden>Actualizar</button>
+				<button id="sair" hidden>Sair</button>
+			</div>
+		</header>
+
+		<main>
+			<p id="aviso" role="status" aria-live="polite" hidden></p>
+
+			<section id="painel-entrada">
+				<h2>Entrar</h2>
+				<form id="entrada">
+					<label for="segredo" class="meta">Password:</label>
+					<input id="segredo" type="password" autocomplete="current-password" required />
+					<button type="submit" class="primaria">Entrar</button>
+				</form>
+			</section>
+
+			<section id="painel-pendentes" hidden>
+				<h2>Ecrãs à espera</h2>
+				<div id="pendentes"></div>
+			</section>
+
+			<section id="painel-dispositivos" hidden>
+				<div class="cabecalho-seccao">
+					<h2>Ecrãs emparelhados</h2>
+					<label class="opcao"><input type="checkbox" id="ver-revogados" /> <span id="ver-revogados-texto">Ver revogados</span></label>
+				</div>
+				<div id="dispositivos"></div>
+			</section>
+		</main>
+
+		<script>
+			/*
+			 * A sede aprova aqui. Não é um backoffice: o que vai justificar uma aplicação própria é a
+			 * monitorização dos 65 ecrãs, não esta página, que se abre uma vez por dispositivo.
+			 *
+			 * O segredo fica em `sessionStorage` e não em `localStorage`: é um portátil partilhado, e
+			 * fechar o separador deve bastar para sair. Nunca é escrito no ecrã nem em log nenhum.
+			 */
+
+			const SEGREDO = 'refood.admin.segredo';
+			const INTERVALO_MS = 60000;
+
+			/** Tecto do adiamento: nem um dropdown esquecido pode congelar a página indefinidamente. */
+			const TECTO_ADIAMENTO_MS = 2 * 60 * 1000;
+
+			const paineis = {
+				entrada: document.getElementById('painel-entrada'),
+				pendentes: document.getElementById('painel-pendentes'),
+				dispositivos: document.getElementById('painel-dispositivos'),
+			};
+			const aviso = document.getElementById('aviso');
+			let temporizador = null;
+			let adiadoDesde = 0;
+
+			function avisar(texto) {
+				aviso.textContent = texto ?? '';
+				aviso.hidden = !texto;
+			}
+
+			function segredo() {
+				return sessionStorage.getItem(SEGREDO) ?? '';
+			}
+
+			async function api(caminho, opcoes = {}) {
+				const resposta = await fetch(caminho, {
+					method: opcoes.metodo ?? 'GET',
+					headers: { authorization: `Bearer ${segredo()}`, 'content-type': 'application/json' },
+					body: opcoes.corpo === undefined ? undefined : JSON.stringify(opcoes.corpo),
+				});
+
+				if (resposta.status === 429) {
+					// A trava do Worker fechou este balde. Insistir não estica o bloqueio — enquanto ele
+					// durar, o segredo nem chega a ser comparado —, mas também não adianta nada.
+					const faltam = Number(resposta.headers.get('retry-after') ?? 0);
+					const minutos = Math.max(1, Math.ceil(faltam / 60));
+					sair();
+					avisar(`Demasiadas tentativas falhadas. Volte a tentar daqui a ${minutos} minutos.`);
+					throw new Error('nao_autorizado');
+				}
+
+				if (resposta.status === 401) {
+					sair();
+					avisar('Segredo recusado.');
+					throw new Error('nao_autorizado');
+				}
+
+				return { estadoHttp: resposta.status, corpo: await resposta.json().catch(() => ({})) };
+			}
+
+			function entrar() {
+				paineis.entrada.hidden = true;
+				paineis.pendentes.hidden = false;
+				paineis.dispositivos.hidden = false;
+				document.getElementById('actualizar').hidden = false;
+				document.getElementById('sair').hidden = false;
+				carregar();
+			}
+
+			function sair() {
+				sessionStorage.removeItem(SEGREDO);
+				clearTimeout(temporizador);
+				paineis.entrada.hidden = false;
+				paineis.pendentes.hidden = true;
+				paineis.dispositivos.hidden = true;
+				document.getElementById('actualizar').hidden = true;
+				document.getElementById('sair').hidden = true;
+			}
+
+			/**
+			 * Núcleos: pedidos uma vez por sessão de página. O Worker já os guarda em cache.
+			 *
+			 * Rebenta em vez de devolver lista vazia. Sem núcleos não há aprovação possível, e um
+			 * dropdown vazio sem explicação leva quem está na sede a pensar que não há núcleos
+			 * nenhuns — quando o que houve foi uma falha a ir buscá-los.
+			 *
+			 * Uma lista vazia conta como falha pelo mesmo motivo: a base tem 87 empresas, e zero é
+			 * um resultado que não se acredita sem confirmação.
+			 */
+			let nucleos = null;
+			async function obterNucleos() {
+				if (nucleos) return nucleos;
+
+				const { estadoHttp, corpo } = await api('/api/admin/nucleos');
+				if (estadoHttp !== 200 || !Array.isArray(corpo.nucleos) || corpo.nucleos.length === 0) {
+					throw new Error(corpo.erro === 'odoo_indisponivel' ? 'nucleos_odoo' : 'nucleos_falharam');
+				}
+
+				// **Pela ordem em que vieram, e não se ordena aqui.** As empresas são ordenadas à mão no
+				// Odoo, e é essa a ordem que quem trabalha na sede conhece de lá. Alfabetar a lista
+				// deste lado dava um dropdown que não bate certo com o Odoo — e desfazia, em duas
+				// linhas de JavaScript, uma ordenação que alguém montou à mão.
+				nucleos = corpo.nucleos;
+				return nucleos;
+			}
+
+			/**
+			 * O nome do núcleo, sem prefixo — o mesmo que aparece no dropdown de escolha, para não se
+			 * escolher por um nome e reler o mesmo núcleo com um código à frente.
+			 *
+			 * Sem a lista carregada sobra o número, que não é bonito mas é honesto: diz que aquele ecrã
+			 * está preso a um núcleo cujo nome não se conseguiu ir buscar.
+			 */
+			function nomeDoNucleo(lista, id) {
+				return lista?.find((candidato) => candidato.id === id)?.name ?? `Núcleo ${id}`;
+			}
+
+			function minutosAte(instante) {
+				const faltam = Math.max(0, Math.round((Date.parse(instante) - Date.now()) / 60000));
+				return faltam <= 1 ? 'menos de um minuto' : `${faltam} minutos`;
+			}
+
+			/** Quanto tempo passou desde um instante, para ir a seguir a `visto:`. Sem instante, `nunca`. */
+			function desde(instante) {
+				if (!instante) return 'nunca';
+				const minutos = Math.round((Date.now() - Date.parse(instante)) / 60000);
+				if (minutos < 1) return 'agora mesmo';
+				if (minutos < 60) return `há ${minutos} min`;
+				const horas = Math.round(minutos / 60);
+				return horas < 48 ? `há ${horas} h` : `há ${Math.round(horas / 24)} dias`;
+			}
+
+			async function carregar(forcar = false) {
+				// Com alguém a mexer num dropdown, a actualização **inteira** espera: não se lêem dados,
+				// não se desenha nada. Uma lista que se recompõe por baixo de uma escolha a meio é pior
+				// do que uma lista um minuto desactualizada, e quem está a escolher é quem tem pressa.
+				if (!forcar && alguemAMexer()) {
+					if (adiadoDesde === 0) adiadoDesde = Date.now();
+
+					// Com um tecto, porém: um dropdown focado e esquecido — alguém que carregou no
+					// campo e foi tratar de outra coisa — não pode congelar a página para sempre. Ao fim
+					// do tecto actualiza-se à mesma, e a linha em uso continua protegida pela
+					// reconciliação, que é a garantia mais forte das duas.
+					if (Date.now() - adiadoDesde < TECTO_ADIAMENTO_MS) {
+						clearTimeout(temporizador);
+						temporizador = setTimeout(carregar, INTERVALO_MS);
+						return;
+					}
+				}
+
+				adiadoDesde = 0;
+
+				// A lista de núcleos falha por si: sem ela ainda vale a pena mostrar quem está à espera
+				// e que ecrãs estão ligados — o que não se pode é deixar a aprovação com ar de possível.
+				let lista = null;
+				let queixa = null;
+
+				try {
+					lista = await obterNucleos();
+				} catch (falha) {
+					if (falha.message === 'nao_autorizado') return;
+					queixa =
+						falha.message === 'nucleos_odoo'
+							? 'O Odoo não respondeu, e sem a lista de núcleos não é possível aprovar. A tentar outra vez.'
+							: 'Não foi possível obter a lista de núcleos, e sem ela não é possível aprovar. A tentar outra vez.';
+				}
+
+				try {
+					const [pendentes, dispositivos] = await Promise.all([api('/api/admin/emparelhamentos'), api('/api/admin/dispositivos')]);
+
+					// A verificação repete-se aqui, e não é zelo a mais: entre o pedido e a resposta passa
+					// tempo — décimas numa rede boa, segundos numa má — e é nesse intervalo que a pessoa
+					// carrega no dropdown. A verificação do princípio já passou; sem esta, o desenho
+					// aterrava com o menu aberto.
+					if (!forcar && alguemAMexer()) {
+						if (adiadoDesde === 0) adiadoDesde = Date.now();
+					} else {
+						adiadoDesde = 0;
+						desenharPendentes(pendentes.corpo.pendentes ?? [], lista, forcar);
+						desenharDispositivos(dispositivos.corpo.dispositivos ?? [], lista);
+					}
+				} catch (falha) {
+					if (falha.message === 'nao_autorizado') return;
+					queixa = 'Não foi possível ler os dados.';
+				}
+
+				avisar(queixa);
+
+				clearTimeout(temporizador);
+				temporizador = setTimeout(carregar, INTERVALO_MS);
+			}
+
+			/**
+			 * As linhas de pendentes que estão no ecrã, por código, para se poderem reaproveitar.
+			 *
+			 * A lista actualiza-se de dez em dez segundos e escolher um núcleo numa lista de 87 demora
+			 * mais do que isso. Reconstruir tudo a cada volta deitava fora a escolha a meio — daí a
+			 * reconciliação: as linhas que ninguém está a usar são refrescadas, as outras ficam onde
+			 * estão, com o que têm dentro.
+			 */
+			let linhasPendentes = new Map();
+
+			/**
+			 * Até quando é que se considera que alguém ainda está a mexer num dropdown.
+			 *
+			 * **Não há maneira de saber se um `<select>` nativo está aberto.** O menu é desenhado pelo
+			 * sistema, fora do DOM: não há evento de abertura nem propriedade que o diga. O foco é o
+			 * sinal mais próximo — e no Chrome verificou-se que se mantém no `<select>` com o menu
+			 * aberto —, mas é um sinal emprestado, e há browsers em que abrir o menu tira o foco à
+			 * página. Daí o segundo sinal: quem carregou ou escreveu num dropdown há pouco tempo conta
+			 * como estando a mexer, mesmo que o foco diga o contrário.
+			 */
+			const JANELA_INTERACCAO_MS = 30 * 1000;
+			let interagidoAte = 0;
+
+			/** Uma linha está em uso se tem núcleo escolhido ou se o dropdown está focado. */
+			function emUso(entrada) {
+				return entrada.escolha.value !== '' || document.activeElement === entrada.escolha;
+			}
+
+			/** Alguém está a mexer num dropdown? Dois sinais, e basta um. */
+			function alguemAMexer() {
+				if (Date.now() < interagidoAte) return true;
+
+				for (const entrada of linhasPendentes.values()) {
+					if (document.activeElement === entrada.escolha) return true;
+				}
+				return false;
+			}
+
+			/**
+			 * Tira uma linha do ecrã e do registo, depois de a interacção com ela ter terminado.
+			 *
+			 * Limpar a escolha antes de a remover não é zelo inútil: enquanto tiver valor, a linha conta
+			 * como em uso, e a reconciliação seguinte tratava-a como uma escolha a proteger.
+			 */
+			function dispensarLinha(codigo) {
+				const entrada = linhasPendentes.get(codigo);
+				if (!entrada) return;
+
+				entrada.escolha.value = '';
+				entrada.cartao.remove();
+				linhasPendentes.delete(codigo);
+			}
+
+			/**
+			 * Marca uma linha cujo emparelhamento deixou de estar à espera enquanto alguém a tinha em
+			 * mãos, em vez de a tirar do ecrã por baixo de uma escolha.
+			 *
+			 * A marca dura **um ciclo**: dez segundos para se ler o que aconteceu, e na volta seguinte a
+			 * linha sai. O que se protege é uma escolha em curso, não os restos de uma escolha que já
+			 * não tem para onde ir — e numa lista que há-de ter 65 ecrãs, resto inerte é pior do que
+			 * uma linha a menos.
+			 *
+			 * O texto não diz "expirou" porque não é só isso: o código pode ter caducado, ou pode ter
+			 * sido outra pessoa da sede a aprová-lo primeiro. Do lado de cá as duas são a mesma coisa —
+			 * já não há nada a fazer com aquela linha — e afirmar a errada seria pior do que não afirmar
+			 * nenhuma.
+			 */
+			function marcarExpirada(entrada) {
+				if (entrada.expirada) return;
+				entrada.expirada = true;
+				entrada.aprovar.disabled = true;
+				entrada.prazo.className = 'estado-revogado';
+				entrada.prazo.textContent = 'já não está à espera — expirou, ou foi aprovado entretanto';
+			}
+
+			function construirPendente(pendente, lista) {
+				const cartao = document.createElement('div');
+				cartao.className = 'cartao';
+
+				const identificacao = document.createElement('div');
+				const codigo = document.createElement('div');
+				codigo.className = 'codigo';
+				codigo.textContent = `${pendente.codigo.slice(0, 3)} ${pendente.codigo.slice(3)}`;
+				const prazo = document.createElement('div');
+				prazo.className = 'meta';
+				prazo.textContent = `expira em ${minutosAte(pendente.expira_em)}`;
+				identificacao.append(codigo, prazo);
+
+				const controlos = document.createElement('div');
+				controlos.className = 'controlos';
+
+				const escolha = document.createElement('select');
+				escolha.setAttribute('aria-label', `Núcleo para o código ${pendente.codigo}`);
+				const vazia = document.createElement('option');
+				vazia.value = '';
+				// Sem lista, o dropdown diz porque está vazio em vez de o estar em silêncio.
+				vazia.textContent = lista ? 'Escolher núcleo…' : 'Lista de núcleos indisponível';
+				escolha.append(vazia);
+
+				// Só o nome. O `center_prefix` era ruído para quem escolhe — o valor da opção
+				// continua a ser o `company_id`, que é o que segue no pedido.
+				for (const nucleo of lista ?? []) {
+					const opcao = document.createElement('option');
+					opcao.value = String(nucleo.id);
+					opcao.textContent = nucleo.name;
+					escolha.append(opcao);
+				}
+
+				const aprovar = document.createElement('button');
+				aprovar.className = 'primaria';
+				aprovar.textContent = 'Aprovar';
+
+				// Sem núcleos não há nada para escolher: o botão fica desligado, e a queixa que
+				// explica porquê está no aviso, em cima.
+				escolha.disabled = !lista;
+				aprovar.disabled = !lista;
+
+				// Carregar ou escrever no campo abre a janela de interacção, que é o sinal que não depende
+				// do foco. `pointerdown` e não `click`: o clique só chega quando o menu fecha.
+				const aMexer = () => (interagidoAte = Date.now() + JANELA_INTERACCAO_MS);
+				escolha.addEventListener('pointerdown', aMexer);
+				escolha.addEventListener('keydown', aMexer);
+
+				// Escolhido o núcleo, a janela fecha-se: a linha passa a estar protegida por ter valor.
+				escolha.addEventListener('change', () => (interagidoAte = 0));
+
+				escolha.addEventListener('blur', () => {
+					// Num browser em que abrir o menu tira o foco à página, este `blur` é o menu a abrir e
+					// não a fechar — e aí a página não tem o foco. Nesse caso não se mexe em nada.
+					if (!document.hasFocus()) return;
+
+					// Saiu mesmo do campo: a actualização adiada corre já, em vez de esperar pelo minuto.
+					interagidoAte = 0;
+					if (adiadoDesde !== 0) carregar();
+				});
+
+				aprovar.addEventListener('click', async () => {
+					if (!escolha.value) return avisar('Escolha o núcleo antes de aprovar.');
+
+					aprovar.disabled = true;
+					const { estadoHttp, corpo } = await api('/api/admin/emparelhamentos/aprovar', {
+						metodo: 'POST',
+						corpo: { codigo: pendente.codigo, company_id: Number(escolha.value) },
+					});
+
+					if (estadoHttp !== 200) {
+						aprovar.disabled = false;
+
+						if (corpo.erro === 'nao_aprovavel') {
+							// O código morreu enquanto esta pessoa decidia. A linha sai — sem a marca de
+							// expirada, que é para quem ainda não carregou em nada — e o ecrã da cozinha já
+							// está a mostrar outro, que aparece aqui na volta seguinte.
+							avisar('Este código já não serve. O ecrã mostra outro dentro de instantes.');
+							dispensarLinha(pendente.codigo);
+							return carregar();
+						}
+
+						avisar('Não foi possível aprovar.');
+						return;
+					}
+
+					// Aprovado: a linha deixa de estar em uso e sai já, para a reconciliação não a
+					// confundir com um código que expirou por si.
+					avisar(null);
+					dispensarLinha(pendente.codigo);
+					carregar();
+				});
+
+				controlos.append(escolha, aprovar);
+				cartao.append(identificacao, controlos);
+
+				return { cartao, escolha, aprovar, prazo, comLista: !!lista, expirada: false };
+			}
+
+			/**
+			 * Reconcilia as linhas de pendentes em vez de as reconstruir.
+			 *
+			 * `forcar` reconstrói tudo, e é o que acontece quando a pessoa carrega em «Actualizar» ou
+			 * acaba de aprovar: aí não há escolha a meio para proteger, e é a forma de limpar do ecrã
+			 * uma linha marcada como expirada.
+			 */
+			function desenharPendentes(pendentes, lista, forcar = false) {
+				const alvo = document.getElementById('pendentes');
+
+				if (forcar) {
+					linhasPendentes = new Map();
+					alvo.replaceChildren();
+				}
+
+				// 1. As que já não estão pendentes saem. Uma que alguém tenha em mãos fica um ciclo, com
+				//    a marca a dizer porquê; no ciclo seguinte — já marcada — sai como as outras.
+				for (const [codigo, entrada] of [...linhasPendentes]) {
+					if (pendentes.some((pendente) => pendente.codigo === codigo)) continue;
+
+					if (emUso(entrada) && !entrada.expirada) {
+						marcarExpirada(entrada);
+						continue;
+					}
+
+					entrada.cartao.remove();
+					linhasPendentes.delete(codigo);
+				}
+
+				// 2. As que estão: refresca-se o prazo das livres, e não se toca nas outras.
+				for (const pendente of pendentes) {
+					const entrada = linhasPendentes.get(pendente.codigo);
+
+					if (entrada) {
+						if (emUso(entrada)) continue;
+
+						// A lista de núcleos chegou depois de a linha ter sido construída sem ela: aí é
+						// preciso refazê-la, porque o dropdown está vazio.
+						if (entrada.comLista !== !!lista) {
+							const nova = construirPendente(pendente, lista);
+							entrada.cartao.replaceWith(nova.cartao);
+							linhasPendentes.set(pendente.codigo, nova);
+							continue;
+						}
+
+						entrada.prazo.textContent = `expira em ${minutosAte(pendente.expira_em)}`;
+						continue;
+					}
+
+					const nova = construirPendente(pendente, lista);
+					linhasPendentes.set(pendente.codigo, nova);
+					alvo.append(nova.cartao);
+				}
+
+				// 3. O aviso de lista vazia é um elemento como os outros, e sai assim que houver linhas.
+				const vazioAnterior = alvo.querySelector('.vazio');
+				if (linhasPendentes.size === 0 && !vazioAnterior) {
+					const vazio = document.createElement('p');
+					vazio.className = 'vazio';
+					vazio.textContent = 'Nenhum ecrã à espera. Um ecrã aparece aqui assim que mostrar um código.';
+					alvo.append(vazio);
+				} else if (linhasPendentes.size > 0 && vazioAnterior) {
+					vazioAnterior.remove();
+				}
+			}
+
+			/**
+			 * O último desenho, guardado para o filtro poder redesenhar sem ir outra vez ao servidor.
+			 *
+			 * A lista de núcleos vem junto porque a etiqueta de cada ecrã precisa dela: no D1 não há
+			 * nome nenhum, o núcleo resolve-se contra o Odoo na altura de mostrar.
+			 */
+			let ultimosDispositivos = [];
+			let ultimaListaDeNucleos = [];
+
+			/**
+			 * Esconder os revogados é **só do lado do ecrã**, e tem de continuar a ser.
+			 *
+			 * O ordinal de cada televisor é contado sobre **todas** as linhas do núcleo, revogadas
+			 * incluídas — é o que dá números estáveis com buracos, e um buraco é informação: alguém
+			 * revogou um ecrã ali. Se o filtro passasse para o `SELECT`, esconder um revogado
+			 * renumerava todos os ecrãs a seguir, e o "ecrã 3" de hoje seria o "ecrã 4" de ontem.
+			 *
+			 * Por isso o servidor continua a devolver tudo, com os ordinais já calculados, e o que
+			 * este filtro faz é não desenhar linhas.
+			 */
+			function desenharDispositivos(dispositivos, lista) {
+				ultimosDispositivos = dispositivos;
+				ultimaListaDeNucleos = lista;
+
+				const alvo = document.getElementById('dispositivos');
+				const verRevogados = document.getElementById('ver-revogados').checked;
+				alvo.replaceChildren();
+
+				const revogados = dispositivos.filter((d) => d.revogado).length;
+
+				// A contagem no rótulo diz que há algo escondido sem ser preciso ligar o filtro —
+				// senão a única forma de saber era experimentar.
+				document.getElementById('ver-revogados-texto').textContent = revogados > 0 ? `Ver revogados (${revogados})` : 'Ver revogados';
+
+				if (dispositivos.length === 0) {
+					const vazio = document.createElement('p');
+					vazio.className = 'vazio';
+					vazio.textContent = 'Ainda não há ecrãs emparelhados.';
+					alvo.append(vazio);
+					return;
+				}
+
+				const visiveis = verRevogados ? dispositivos : dispositivos.filter((d) => !d.revogado);
+
+				// **Esconder não pode passar a dizer que não existe.** Com tudo revogado e o filtro
+				// desligado, "ainda não há ecrãs emparelhados" era falso — e mandava alguém emparelhar
+				// outra vez um ecrã que já está na base.
+				if (visiveis.length === 0) {
+					const vazio = document.createElement('p');
+					vazio.className = 'vazio';
+					vazio.textContent = `Todos os ecrãs emparelhados estão revogados (${revogados}). Ligue "Ver revogados" para os ver.`;
+					alvo.append(vazio);
+					return;
+				}
+
+				for (const dispositivo of visiveis) {
+					const cartao = document.createElement('div');
+					cartao.className = dispositivo.revogado ? 'cartao revogado' : 'cartao';
+
+					const identificacao = document.createElement('div');
+					const etiqueta = document.createElement('div');
+					etiqueta.className = 'etiqueta';
+					// A etiqueta é núcleo + ordinal. No D1 não há nome nenhum: o núcleo vem do Odoo e o
+					// número é a ordem de emparelhamento, contada também sobre os revogados.
+					etiqueta.textContent = `${nomeDoNucleo(lista, dispositivo.company_id)} · ecrã ${dispositivo.ordinal}`;
+
+					const meta = document.createElement('div');
+					meta.className = 'meta';
+					meta.textContent = `visto: ${desde(dispositivo.visto_em)}${dispositivo.versao ? ` · versão ${dispositivo.versao}` : ''}`;
+					identificacao.append(etiqueta, meta);
+
+					const controlos = document.createElement('div');
+					controlos.className = 'controlos';
+
+					if (dispositivo.revogado) {
+						const marca = document.createElement('span');
+						marca.className = 'estado-revogado';
+						// Sem data de revogação não se diz "Revogado nunca": diz-se só que está revogado.
+						// A coluna só existe desde a 0002, e uma linha revogada à mão pode não a ter.
+						marca.textContent = dispositivo.revogado_em ? `Revogado ${desde(dispositivo.revogado_em)}` : 'Revogado';
+						controlos.append(marca);
+					} else {
+						const revogar = document.createElement('button');
+						revogar.className = 'perigo';
+						revogar.textContent = 'Revogar';
+						revogar.addEventListener('click', async () => {
+							if (!confirm(`Revogar ${etiqueta.textContent}? O ecrã deixa de mostrar dados no pedido seguinte.`)) return;
+
+							revogar.disabled = true;
+							const { estadoHttp } = await api('/api/admin/dispositivos/revogar', { metodo: 'POST', corpo: { id: dispositivo.id } });
+							if (estadoHttp !== 200) {
+								revogar.disabled = false;
+								avisar('Não foi possível revogar.');
+								return;
+							}
+							carregar();
+						});
+						controlos.append(revogar);
+					}
+
+					cartao.append(identificacao, controlos);
+					alvo.append(cartao);
+				}
+			}
+
+			document.getElementById('entrada').addEventListener('submit', (evento) => {
+				evento.preventDefault();
+				const campo = document.getElementById('segredo');
+				if (!campo.value) return;
+
+				sessionStorage.setItem(SEGREDO, campo.value);
+				campo.value = '';
+				avisar(null);
+				entrar();
+			});
+
+			// Redesenha do que já está em memória: mudar o filtro não é motivo para ir ao servidor,
+			// e ir lá punha a caixa a piscar de cada vez que alguém a liga.
+			document
+				.getElementById('ver-revogados')
+				.addEventListener('change', () => desenharDispositivos(ultimosDispositivos, ultimaListaDeNucleos));
+
+			document.getElementById('actualizar').addEventListener('click', () => carregar(true));
+			document.getElementById('sair').addEventListener('click', () => sair());
+
+			if (segredo()) entrar();
+		</script>
+	</body>
+</html>

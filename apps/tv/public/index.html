@@ -1,20 +1,442 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="pt-PT">
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Hello, World!</title>
+		<title>Refood TV</title>
+		<link rel="icon" href="/img/favicon.ico" sizes="any" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<style>
+			/*
+			 * Ecrã de emparelhamento. É visto de três a quatro metros, numa cozinha com luz de teto:
+			 * a TV é escura sempre, o corrente não desce dos 40px e nada aqui desce dos 32px.
+			 */
+			* {
+				box-sizing: border-box;
+				margin: 0;
+			}
+
+			body {
+				background: var(--n-950);
+				color: var(--n-000);
+				font-family: var(--fonte);
+				font-weight: 500; /* sobre fundo escuro, o 400 esvai-se a três metros */
+				font-size: 40px;
+				line-height: 1.3;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				padding: var(--e-16);
+				text-align: center;
+			}
+
+			main {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: var(--e-12);
+				max-width: 1400px;
+			}
+
+			/*
+			 * Logótipo — variante horizontal com assinatura, a branco, porque o fundo é `--n-950`.
+			 * O ficheiro a branco é o `..._fundo_escuro.svg`; o `..._fundo_branco.svg` é o mesmo
+			 * desenho com o RE, a mãozinha e a faca a preto, e aqui desapareceria no fundo.
+			 *
+			 * Largura de 480px: o mínimo do `design.md` para a TV são 240px, e este ecrã é visto
+			 * de três a quatro metros.
+			 *
+			 * Margem de proteção = altura do "F" de FOOD, em toda a volta. No ficheiro o "F" mede
+			 * 68,281 de 544,07 de largura, ou seja 12,55%; a 480px dá 60,2px, e o degrau acima na
+			 * escala é 64px (`--e-16`). O `gap` do `main` e o `padding` do `body` só acrescentam.
+			 */
+			.marca {
+				display: block;
+				width: 480px;
+				height: auto;
+				margin: var(--e-16);
+			}
+
+			/*
+			 * A instrução e a contagem medem o mesmo que o código, e é o código que manda: a coluna
+			 * é `min-content`, os seis dígitos não partem, logo a coluna fica exactamente da largura
+			 * deles e o texto quebra dentro dessa medida.
+			 *
+			 * Não leva largura fixa de propósito. A pilha de tipos ainda cai no que o televisor
+			 * tiver, e quando a Inter entrar os dígitos mudam de largura — assim o resto acompanha
+			 * sozinho, em vez de ficar um número escrito à mão a desalinhar.
+			 */
+			#ecra-emparelhamento {
+				display: grid;
+				grid-template-columns: min-content;
+			}
+
+			/* O número de destaque: amarelo sobre escuro são 11,7:1 — o acento mais forte que a marca
+			   permite, e o único sítio onde o amarelo é texto. */
+			.codigo {
+				font-size: 200px;
+				font-weight: var(--peso-destaque);
+				font-variant-numeric: tabular-nums;
+				color: var(--marca-amarelo);
+				display: flex;
+				gap: var(--e-8);
+				line-height: 1;
+			}
+
+			.contagem {
+				font-size: 32px;
+				color: var(--n-400);
+				font-variant-numeric: tabular-nums;
+			}
+
+			.aviso {
+				font-size: 40px;
+				color: var(--erro-claro);
+				max-width: 24ch;
+			}
+
+			.confirmado {
+				font-size: 64px;
+				font-weight: var(--peso-destaque);
+				color: var(--ok-claro);
+			}
+
+			/* O nome do núcleo é o que se lê da porta da cozinha para confirmar que não houve troca. */
+			.nucleo {
+				font-size: 80px;
+				font-weight: var(--peso-destaque);
+				line-height: 1.1;
+				margin-top: var(--e-6);
+			}
+
+			[hidden] {
+				display: none !important;
+			}
+		</style>
 	</head>
 	<body>
-		<h1 id="heading"></h1>
-		<p>This page comes from a static asset stored at `public/index.html` as configured in `wrangler.jsonc`.</p>
+		<main>
+			<img class="marca" src="/img/refood_logo_horizontal_fundo_escuro.svg" width="544" height="218" alt="Refood" />
+
+			<section id="ecra-emparelhamento" hidden>
+				<p class="instrucao">Para ligar este ecrã, indique este código:</p>
+				<p class="codigo" aria-label="Código de emparelhamento"><span id="codigo-a">—</span><span id="codigo-b">—</span></p>
+				<p class="contagem"><span id="contagem">—</span> até o código mudar</p>
+			</section>
+
+			<section id="ecra-espera" hidden>
+				<p class="instrucao">A preparar o ecrã…</p>
+			</section>
+
+			<section id="ecra-ligado" hidden>
+				<p class="confirmado">Ecrã ligado</p>
+				<!-- O núcleo é o que se confere ao telefone com a sede, ainda com a pessoa em linha. -->
+				<p class="nucleo" id="nucleo"></p>
+				<p class="contagem">Os painéis aparecem já a seguir.</p>
+			</section>
+
+			<p id="aviso" class="aviso" role="status" aria-live="polite" hidden></p>
+		</main>
+
 		<script>
-			fetch('/message')
-				.then((resp) => resp.text())
-				.then((text) => {
-					const h1 = document.getElementById('heading');
-					h1.textContent = text;
+			/*
+			 * O emparelhamento visto do lado da TV.
+			 *
+			 * O segredo é gerado aqui, guardado aqui, e só sai deste ecrã na recolha. Ao servidor vai
+			 * primeiro o SHA-256 dele; o código de 6 dígitos que aparece no ecrã não abre nada sozinho.
+			 *
+			 * A geração e o hash repetem, em dez linhas, o que o `src/auth.ts` faz do lado do Worker.
+			 * É duplicação consciente: os assets são servidos estáticos, sem passo de compilação que
+			 * pudesse importar o módulo. O formato — 32 bytes, base64url, prefixo `seg_`, SHA-256 em
+			 * hex minúsculo — tem de continuar igual nos dois sítios.
+			 *
+			 * Tudo corre num temporizador só. Um ecrã destes fica ligado semanas seguidas: dois ciclos
+			 * a arrancarem-se um ao outro não dão erro nenhum, dão o dobro dos pedidos, e depois o
+			 * quádruplo.
+			 */
+
+			const GUARDADO = 'refood.tv.emparelhamento';
+			const TOKEN = 'refood.tv.token';
+			const SONDAGEM_MS = 3000;
+			const RECUO_MS = 10000;
+
+			/**
+			 * De quanto em quanto tempo o ecrã diz que está vivo.
+			 *
+			 * Cinco minutos é o que limita duas coisas ao mesmo tempo: quanto tempo um ecrã revogado
+			 * continua a mostrar o que tinha — a revogação chega no 401 do sinal seguinte — e quanto
+			 * tempo a monitorização demora a notar um ecrã que se desligou. São 65 ecrãs ligados umas
+			 * cinco horas por dia: dá cerca de 3.900 pedidos por dia, uma fracção do que os painéis
+			 * vão pedir sozinhos.
+			 */
+			const SINAL_MS = 5 * 60 * 1000;
+
+			/** Quanto tempo fica o núcleo no ecrã antes de os painéis entrarem. */
+			const ESPERA_ATE_AO_PAINEL_MS = 6000;
+
+			const ecras = {
+				emparelhamento: document.getElementById('ecra-emparelhamento'),
+				espera: document.getElementById('ecra-espera'),
+				ligado: document.getElementById('ecra-ligado'),
+			};
+			const aviso = document.getElementById('aviso');
+
+			/** Quando o ciclo pode voltar a sondar, a tentar iniciar, e a dar sinal de vida. */
+			let proximaSonda = 0;
+			let proximaTentativa = 0;
+			let proximoSinal = 0;
+
+			/** `emparelhamento` enquanto não há token; `servico` depois de o haver. */
+			let modo = 'emparelhamento';
+
+			function mostrar(nome) {
+				for (const [chave, elemento] of Object.entries(ecras)) elemento.hidden = chave !== nome;
+			}
+
+			function avisar(texto) {
+				aviso.textContent = texto ?? '';
+				aviso.hidden = !texto;
+			}
+
+			/** 32 bytes aleatórios em base64url, com o mesmo prefixo que o Worker espera. */
+			function gerarSegredo() {
+				const bytes = crypto.getRandomValues(new Uint8Array(32));
+				const binario = String.fromCharCode(...bytes);
+				return 'seg_' + btoa(binario).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+			}
+
+			/** SHA-256 em hex minúsculo — a forma em que o Worker guarda e procura. */
+			async function hash(valor) {
+				const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(valor));
+				return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+			}
+
+			function lerGuardado() {
+				try {
+					return JSON.parse(localStorage.getItem(GUARDADO) ?? 'null');
+				} catch {
+					return null;
+				}
+			}
+
+			async function pedir(caminho, corpo) {
+				const resposta = await fetch(caminho, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify(corpo),
 				});
+				return { estadoHttp: resposta.status, corpo: await resposta.json().catch(() => ({})) };
+			}
+
+			/**
+			 * Começa um emparelhamento novo.
+			 *
+			 * **Segredo novo de cada vez, e o anterior deitado fora.** Quando um código expira, a TV
+			 * não reaproveita o que tinha guardado: aquele segredo pertencia a um emparelhamento que
+			 * já não vale, e reutilizá-lo esbarra no índice único enquanto a linha antiga estiver viva.
+			 */
+			async function iniciar() {
+				mostrar('espera');
+				localStorage.removeItem(GUARDADO);
+				proximaTentativa = Date.now() + RECUO_MS;
+
+				const segredo = gerarSegredo();
+				let resposta;
+				try {
+					resposta = await pedir('/api/emparelhamento', { segredo_hash: await hash(segredo) });
+				} catch {
+					avisar('Sem ligação à rede.');
+					return;
+				}
+
+				if (resposta.estadoHttp !== 201) {
+					avisar('Não foi possível preparar este ecrã. A tentar outra vez.');
+					return;
+				}
+
+				avisar(null);
+				localStorage.setItem(GUARDADO, JSON.stringify({ segredo, codigo: resposta.corpo.codigo, expira_em: resposta.corpo.expira_em }));
+				proximaSonda = Date.now() + SONDAGEM_MS;
+				mostrarCodigo();
+			}
+
+			function mostrarCodigo() {
+				const guardado = lerGuardado();
+				if (!guardado) return;
+
+				document.getElementById('codigo-a').textContent = guardado.codigo.slice(0, 3);
+				document.getElementById('codigo-b').textContent = guardado.codigo.slice(3);
+				mostrar('emparelhamento');
+			}
+
+			function actualizarContagem(faltamSegundos) {
+				const minutos = Math.floor(faltamSegundos / 60);
+				const segundos = String(faltamSegundos % 60).padStart(2, '0');
+				document.getElementById('contagem').textContent = `${minutos}:${segundos}`;
+			}
+
+			async function sondar(guardado) {
+				proximaSonda = Date.now() + SONDAGEM_MS;
+
+				let resposta;
+				try {
+					resposta = await pedir('/api/emparelhamento/estado', { codigo: guardado.codigo, segredo: guardado.segredo });
+				} catch {
+					// Rede em baixo. O código continua válido, por isso fica no ecrã e tenta-se a seguir.
+					avisar('Sem ligação à rede.');
+					return;
+				}
+
+				avisar(null);
+
+				if (resposta.corpo?.estado === 'expirado') return await iniciar();
+				if (resposta.corpo?.estado === 'pronto') return await recolher(guardado);
+			}
+
+			async function recolher(guardado) {
+				let resposta;
+				try {
+					resposta = await pedir('/api/emparelhamento/recolher', { codigo: guardado.codigo, segredo: guardado.segredo });
+				} catch {
+					avisar('Sem ligação à rede.');
+					return;
+				}
+
+				// Não deu token: o emparelhamento já não serve para nada. Recomeça-se do princípio.
+				if (resposta.estadoHttp !== 201) return await iniciar();
+
+				// O token substitui o segredo, que a partir daqui não abre mais nada.
+				localStorage.setItem(TOKEN, resposta.corpo.token);
+				localStorage.removeItem(GUARDADO);
+				entrarEmServico();
+			}
+
+			/* ------------------------------------------------------------------ em serviço */
+
+			/**
+			 * Um pedido com o token. Devolve `null` quando não há resposta útil.
+			 *
+			 * **Um 401 apaga tudo.** Token e segredo vão fora e o ecrã volta ao emparelhamento sem
+			 * estado nenhum: emparelha como dispositivo novo, e o antigo fica revogado do lado da sede,
+			 * que é o registo que se quer. Não se tenta salvar nada — um token recusado não volta a
+			 * ser aceite, e insistir com ele só atrasa o ecrã a voltar a funcionar.
+			 */
+			async function pedirComToken(caminho, metodo = 'GET') {
+				const token = localStorage.getItem(TOKEN);
+				if (!token) return null;
+
+				let resposta;
+				try {
+					resposta = await fetch(caminho, { method: metodo, headers: { authorization: `Bearer ${token}` } });
+				} catch {
+					avisar('Sem ligação à rede.');
+					return null;
+				}
+
+				if (resposta.status === 401) {
+					perderCredenciais();
+					return null;
+				}
+
+				avisar(null);
+				if (!resposta.ok) return null;
+
+				return await resposta.json().catch(() => null);
+			}
+
+			/** O caminho de volta ao princípio: sem token, sem segredo, sem código. */
+			function perderCredenciais() {
+				localStorage.removeItem(TOKEN);
+				localStorage.removeItem(GUARDADO);
+				document.getElementById('nucleo').textContent = '';
+				modo = 'emparelhamento';
+				proximaTentativa = 0;
+				proximaSonda = 0;
+				mostrar('espera');
+			}
+
+			/**
+			 * Passa a ecrã em serviço e, daí a uns segundos, vai para o painel.
+			 *
+			 * A pausa não é estética: é o tempo de quem está ao telefone com a sede confirmar que o
+			 * núcleo que apareceu é o certo. Uma aprovação enganada apanha-se aqui, com a pessoa
+			 * ainda em linha, em vez de dar por ela semanas depois ao ver os números errados.
+			 *
+			 * Numa recarga com token já guardado isto corre na mesma, e é o que se quer: um
+			 * televisor que arranca sozinho de manhã confirma o núcleo e segue para o painel.
+			 */
+			function entrarEmServico() {
+				modo = 'servico';
+				proximoSinal = Date.now() + SINAL_MS;
+				mostrar('ligado');
+				mostrarNucleo();
+				setTimeout(() => {
+					if (localStorage.getItem(TOKEN)) location.href = '/painel.html';
+				}, ESPERA_ATE_AO_PAINEL_MS);
+			}
+
+			/** Vai buscar o nome do núcleo em que este ecrã ficou. Volta a tentar-se se falhar. */
+			async function mostrarNucleo() {
+				const corpo = await pedirComToken('/api/nucleo');
+				if (corpo?.nucleo?.nome) document.getElementById('nucleo').textContent = corpo.nucleo.nome;
+			}
+
+			/**
+			 * O ciclo único: um tique por segundo, nos dois modos.
+			 *
+			 * Em serviço quase não faz nada — olha para o relógio e, de cinco em cinco minutos, dá
+			 * sinal de vida. É esse sinal que traz o 401 quando o ecrã é revogado na sede, e é por
+			 * isso que ele existe: uma TV parada a mostrar o mesmo painel, sem pedir nada, era
+			 * indistinguível de uma TV desligada e nunca dava por ter sido revogada.
+			 */
+			async function ciclo() {
+				if (modo === 'servico') {
+					if (Date.now() >= proximoSinal) {
+						proximoSinal = Date.now() + SINAL_MS;
+						await pedirComToken('/api/sinal', 'POST');
+						// Se o núcleo ainda não apareceu — a primeira tentativa falhou —, tenta-se outra vez.
+						if (modo === 'servico' && !document.getElementById('nucleo').textContent) await mostrarNucleo();
+					}
+
+					setTimeout(ciclo, 1000);
+					return;
+				}
+
+				const guardado = lerGuardado();
+
+				if (!guardado) {
+					if (Date.now() >= proximaTentativa) await iniciar();
+				} else {
+					const faltam = Math.max(0, Math.round((Date.parse(guardado.expira_em) - Date.now()) / 1000));
+					actualizarContagem(faltam);
+
+					// Chegado ao fim, a TV não espera pela resposta do servidor para saber que o código
+					// morreu: pede outro, com um segredo novo.
+					if (faltam === 0) await iniciar();
+					else if (Date.now() >= proximaSonda) await sondar(guardado);
+				}
+
+				setTimeout(ciclo, 1000);
+			}
+
+			function arrancar() {
+				if (localStorage.getItem(TOKEN)) {
+					// Com token, o ecrã entra logo em serviço — e é a primeira chamada que confirma se o
+					// token ainda vale. Se tiver sido revogado entretanto, o 401 devolve-o ao princípio.
+					entrarEmServico();
+				} else {
+					// Uma recarga da página no meio do emparelhamento não é um emparelhamento novo:
+					// retoma-se o que estava, com o mesmo segredo, em vez de deixar uma linha viva
+					// pendurada na base.
+					const guardado = lerGuardado();
+					if (guardado && Date.parse(guardado.expira_em) > Date.now()) mostrarCodigo();
+					else mostrar('espera');
+				}
+
+				ciclo();
+			}
+
+			arrancar();
 		</script>
 	</body>
 </html>

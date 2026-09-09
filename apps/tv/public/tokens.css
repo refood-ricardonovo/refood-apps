@@ -1,0 +1,80 @@
+/*
+ * Tokens de design, tal como estão em `docs/design.md`.
+ *
+ * Ficheiro único e copiado tal e qual: se a TV e a PWA tiverem cada uma o seu `#F5B72F` escrito à
+ * mão, divergem em três meses. Quando a PWA existir, isto passa para um pacote partilhado.
+ *
+ * O `@font-face` vive aqui, e não no HTML de cada página, pela mesma razão: a fonte faz parte dos
+ * tokens. O `url` é absoluto — cada app serve a sua cópia do ficheiro em `/fonts/`.
+ */
+
+/*
+ * Inter variável, auto-alojada. Sem chamada ao Google Fonts: o ficheiro sai do mesmo Worker, na
+ * mesma origem. Menos uma dependência externa numa box que arranca sozinha numa cozinha, e menos
+ * uma discussão de RGPD.
+ *
+ * **Subset latino, e chega para pt-PT.** O `U+0000-00FF` traz todos os acentos e a cedilha, e o
+ * `U+2000-206F` traz o travessão e as reticências, que as duas páginas usam. O `latin-ext` é para
+ * checo, polaco e turco: seriam mais 37 KB para não mostrar nada de novo.
+ *
+ * **Um ficheiro só,** com o eixo `wght` de 100 a 900. Os quatro pesos do `design.md` — 400, 500,
+ * 600 e 700 — saem todos daqui, sem quatro descarregamentos e sem interpolação falsa do browser.
+ *
+ * **`font-display: swap`:** o texto aparece logo na fonte de recurso e troca quando a Inter chega.
+ * Nunca fica invisível à espera. Em troca há um salto quando troca — ver a nota no `index.html`
+ * sobre a largura do código de emparelhamento.
+ *
+ * Inter v20, extraída do `@fontsource-variable/inter@5.3.0`, ficheiro `inter-latin-wght-normal`.
+ * Licença SIL OFL 1.1, distribuída ao lado em `/fonts/OFL.txt` como a licença exige.
+ */
+@font-face {
+	font-family: 'Inter';
+	font-style: normal;
+	font-weight: 100 900;
+	font-display: swap;
+	src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+		U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+	/* Marca — fixo, do Guia de Utilização da Marca REFOOD */
+	--marca-amarelo: #f5b72f;
+	--marca-preto: #000000;
+
+	/* Neutros */
+	--n-950: #0f0f0f;
+	--n-900: #1a1a1a;
+	--n-800: #2b2b2b;
+	--n-600: #5a5a5a;
+	--n-400: #9a9a9a;
+	--n-200: #d6d6d6;
+	--n-100: #ededed;
+	--n-000: #ffffff;
+
+	/* Estados — nenhum usa amarelo: o amarelo é a marca, não um aviso */
+	--erro-claro: #ff7a6e;
+	--erro-escuro: #c5342a;
+	--ok-claro: #5cd68a;
+	--ok-escuro: #1e7a44;
+	--info-claro: #5aa9ff;
+	--info-escuro: #1a5fb4;
+
+	/* Tipo */
+	--fonte: Inter, Helvetica, Arial, sans-serif;
+	--peso-corrente: 400; /* 500 sobre fundo escuro */
+	--peso-enfase: 600;
+	--peso-destaque: 700;
+
+	/* Espaço */
+	--e-1: 4px;
+	--e-2: 8px;
+	--e-3: 12px;
+	--e-4: 16px;
+	--e-6: 24px;
+	--e-8: 32px;
+	--e-12: 48px;
+	--e-16: 64px;
+	--e-24: 96px;
+}

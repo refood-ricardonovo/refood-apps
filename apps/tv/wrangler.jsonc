@@ -6,12 +6,18 @@
   "assets": {
     "directory": "./public"
   },
+  // As migrações vivem em `migrations/` na raiz do monorepo, e não aqui dentro: a base é
+  // partilhada com a PWA e o `d1_migrations` é um livro-razão único. Ver o CLAUDE.md da raiz.
+  //
+  // `migrations_dir` é relativo a este ficheiro. E repete-se no `env.staging` porque
+  // `d1_databases` é chave não-herdável — o array é substituído inteiro, não fundido.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "refood-db",
       "database_id": "1756a0f6-9464-4257-a6ac-7fee8118dc70",
-      "preview_database_id": "48465336-f8d0-45f3-beef-b7149c1d4a8a"
+      "preview_database_id": "48465336-f8d0-45f3-beef-b7149c1d4a8a",
+      "migrations_dir": "../../migrations"
     }
   ],
   "vars": {
@@ -19,5 +25,38 @@
     "ODOO_DB": "refoodteste"
   },
   "observability": { "enabled": true },
-  "upload_source_maps": true
+  "upload_source_maps": true,
+  // Ambiente de staging, para poder endereçar a base de staging pelo nome
+  // (o wrangler só resolve nomes de D1 a partir deste ficheiro).
+  // As chaves não-herdáveis — d1_databases e vars — têm de ser repetidas aqui.
+  // O `routes` é herdável, e está cá dentro de propósito: ver o comentário lá.
+  "env": {
+    "staging": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "refood-db-staging",
+          "database_id": "48465336-f8d0-45f3-beef-b7149c1d4a8a",
+          "migrations_dir": "../../migrations"
+        }
+      ],
+      "vars": {
+        "ODOO_URL": "https://staging.onrefood.com",
+        "ODOO_DB": "refoodteste"
+      },
+      // Domínio próprio deste ambiente. `custom_domain: true` faz o wrangler criar o
+      // registo de DNS e o certificado no deploy — a zona `myrefood.pt` tem de já
+      // estar na conta.
+      //
+      // Fica aqui dentro, e não no topo, apesar de `routes` ser uma chave herdável:
+      // no topo passaria a valer para produção, que é o ambiente que ainda não tem
+      // domínio decidido. O `myrefood.pt` é staging permanente, não produção.
+      "routes": [
+        {
+          "pattern": "tv-staging.myrefood.pt",
+          "custom_domain": true
+        }
+      ]
+    }
+  }
 }
