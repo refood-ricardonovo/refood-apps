@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-PT">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<title>Refood</title>
+
+		<link rel="icon" href="/img/favicon.ico" sizes="any" />
+		<link rel="stylesheet" href="/tokens.css" />
+
+		<!--
+			O manifest é o que torna isto instalável. O `theme_color` está lá dentro e repete-se aqui
+			porque o browser lê a meta antes de ir buscar o manifest: sem ela, a barra do sistema
+			pisca a claro no primeiro instante.
+		-->
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="theme-color" content="#0f0f0f" />
+
+		<!--
+			O iOS ignora o manifest para o ícone e para o modo de ecrã inteiro: quer as suas próprias
+			metas. `apple-mobile-web-app-capable` está obsoleta em favor de `mobile-web-app-capable`,
+			mas as versões de iOS que hoje andam nos telemóveis ainda só entendem a antiga — vão as
+			duas, e sai a antiga quando deixar de ser precisa.
+		-->
+		<link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Refood" />
+
+		<style>
+			/*
+			 * Uma página: o logótipo ao meio de um fundo escuro, e mais nada.
+			 *
+			 * **É descartável.** Existe para uma apresentação, e o que vier a ser a PWA não se
+			 * parece com isto. Nada aqui é fundação — nem o modo escuro, que é escolha deste ecrã
+			 * e não uma decisão sobre o aspecto da app. Ver o CLAUDE.md desta app.
+			 */
+			* {
+				box-sizing: border-box;
+				margin: 0;
+			}
+
+			html,
+			body {
+				height: 100%;
+			}
+
+			body {
+				background: var(--n-950);
+				color: var(--n-000);
+				font-family: var(--fonte);
+
+				display: grid;
+				place-items: center;
+				/*
+				 * `100dvh` e não `100vh`: em `standalone` no iOS a barra do sistema entra na conta e
+				 * o `vh` empurrava o logótipo para fora do centro. O `padding` do `safe-area` é o
+				 * que o mantém longe do entalhe e da barra de gestos.
+				 */
+				min-height: 100dvh;
+				padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
+					max(24px, env(safe-area-inset-left));
+			}
+
+			/*
+			 * A largura do logótipo.
+			 *
+			 * `min(70vw, 420px)` dá ~270px num telemóvel estreito e trava nos 420 num tablet — bem
+			 * acima do mínimo de **96px** que o `docs/design.md` fixa para a versão horizontal, e com
+			 * a margem de proteção (a altura do "F" de FOOD, em toda a volta) folgadamente cumprida
+			 * pelo próprio centro do ecrã.
+			 *
+			 * `height: auto` desfaz os `width`/`height` em px que o Illustrator deixou no SVG.
+			 */
+			.logotipo {
+				width: min(70vw, 420px);
+				height: auto;
+			}
+		</style>
+	</head>
+	<body>
+		<!--
+			O logótipo e não a palavra em texto: o guia da marca não prevê um wordmark escrito à mão,
+			e este ficheiro é a variante para fundo escuro que o guia autoriza. O `alt` leva o nome,
+			que é o que um leitor de ecrã precisa de dizer.
+		-->
+		<img class="logotipo" src="/img/refood_logo_horizontal_fundo_escuro.svg" alt="Refood" />
+
+		<script>
+			/*
+			 * O service worker existe por uma razão só: **sem ele o Chrome não oferece instalar.**
+			 * O critério de instalação no Android é manifest + um service worker com handler de
+			 * `fetch`; o iOS instala sem nenhum.
+			 *
+			 * Não guarda nada e não serve nada de cache — ver `sw.js`. Registado depois do `load`
+			 * para não competir com o que a página está a desenhar, e com a falha engolida: um
+			 * registo que falhe tira o botão de instalar, não parte a página.
+			 */
+			if ('serviceWorker' in navigator) {
+				addEventListener('load', () => {
+					navigator.serviceWorker.register('/sw.js').catch(() => {});
+				});
+			}
+		</script>
+	</body>
+</html>

@@ -1,0 +1,35 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "refood-app",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-08-25",
+	"assets": {
+		"directory": "./public",
+		// **Sem `not_found_handling`, e é de propósito.** O valor por omissão deixa um pedido que não
+		// corresponda a ficheiro nenhum cair no Worker, que é o que permite existir `/api/*`. Pôr
+		// `single-page-application` faria o servidor de assets responder `index.html` a tudo — e o
+		// Worker deixava de correr, `/api/health` incluído. Se um dia a página precisar de rotas do
+		// lado do cliente, o que isso pede é `run_worker_first` para `/api/*`, não este atalho.
+	},
+	// **Sem D1, sem KV, sem `vars`.** Nesta fase a app não fala com o Odoo nem guarda estado: é uma
+	// página e um `/api/health`. O `Env` está vazio, e é isso que o `worker-configuration.d.ts`
+	// gerado diz. Quando houver a primeira ligação, entra aqui — e o `migrations_dir` da D1
+	// partilhada tem de apontar para `../../migrations`, como no da TV. Ver o CLAUDE.md da raiz.
+	"observability": { "enabled": true },
+	"upload_source_maps": true,
+	// Ambiente de staging. O `routes` fica aqui dentro e não no topo, apesar de ser chave herdável:
+	// no topo passava a valer para produção, que ainda não tem domínio decidido. O `myrefood.pt` é
+	// staging permanente, não produção. Mesma decisão que está no `wrangler.jsonc` da TV.
+	"env": {
+		"staging": {
+			// `custom_domain: true` faz o wrangler criar o registo de DNS e o certificado no deploy.
+			// A zona `myrefood.pt` já está na conta — é a mesma de `tv-staging.myrefood.pt`.
+			"routes": [
+				{
+					"pattern": "app-staging.myrefood.pt",
+					"custom_domain": true,
+				},
+			],
+		},
+	},
+}
