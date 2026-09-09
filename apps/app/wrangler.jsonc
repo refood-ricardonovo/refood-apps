@@ -11,17 +11,48 @@
 		// Worker deixava de correr, `/api/health` incluído. Se um dia a página precisar de rotas do
 		// lado do cliente, o que isso pede é `run_worker_first` para `/api/*`, não este atalho.
 	},
-	// **Sem D1, sem KV, sem `vars`.** Nesta fase a app não fala com o Odoo nem guarda estado: é uma
-	// página e um `/api/health`. O `Env` está vazio, e é isso que o `worker-configuration.d.ts`
-	// gerado diz. Quando houver a primeira ligação, entra aqui — e o `migrations_dir` da D1
-	// partilhada tem de apontar para `../../migrations`, como no da TV. Ver o CLAUDE.md da raiz.
+	// A base é partilhada com o `apps/tv` e o `d1_migrations` é um livro-razão único, por isso as
+	// migrações vivem em `migrations/` na raiz do monorepo. Ver o CLAUDE.md da raiz.
+	//
+	// `migrations_dir` é relativo a este ficheiro, e **repete-se no `env.staging`** porque
+	// `d1_databases` é chave não-herdável: o array é substituído inteiro, nunca fundido. Uma entrada
+	// sem ele cai num `./migrations` que aqui não existe, e o wrangler diz que não há nada a aplicar.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "refood-db",
+			"database_id": "1756a0f6-9464-4257-a6ac-7fee8118dc70",
+			"preview_database_id": "48465336-f8d0-45f3-beef-b7149c1d4a8a",
+			"migrations_dir": "../../migrations",
+		},
+	],
+	// `vars` são valores públicos, cozidos nos tipos gerados. As credenciais do Odoo e o interruptor
+	// da entrada são secrets — ver `.dev.vars.example`.
+	"vars": {
+		"ODOO_URL": "https://staging.onrefood.com",
+		"ODOO_DB": "refoodteste",
+	},
 	"observability": { "enabled": true },
 	"upload_source_maps": true,
 	// Ambiente de staging. O `routes` fica aqui dentro e não no topo, apesar de ser chave herdável:
 	// no topo passava a valer para produção, que ainda não tem domínio decidido. O `myrefood.pt` é
 	// staging permanente, não produção. Mesma decisão que está no `wrangler.jsonc` da TV.
+	//
+	// As chaves não-herdáveis — `d1_databases` e `vars` — têm de ser repetidas aqui.
 	"env": {
 		"staging": {
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "refood-db-staging",
+					"database_id": "48465336-f8d0-45f3-beef-b7149c1d4a8a",
+					"migrations_dir": "../../migrations",
+				},
+			],
+			"vars": {
+				"ODOO_URL": "https://staging.onrefood.com",
+				"ODOO_DB": "refoodteste",
+			},
 			// `custom_domain: true` faz o wrangler criar o registo de DNS e o certificado no deploy.
 			// A zona `myrefood.pt` já está na conta — é a mesma de `tv-staging.myrefood.pt`.
 			"routes": [

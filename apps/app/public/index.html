@@ -77,6 +77,87 @@
 				width: min(70vw, 420px);
 				height: auto;
 			}
+
+			/* ------------------------------------------------------------- a entrada */
+
+			body {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 40px;
+			}
+
+			.entrada {
+				display: flex;
+				flex-direction: column;
+				gap: 16px;
+				width: min(70vw, 420px);
+			}
+
+			/*
+			 * O campo aceita o que a pessoa escrever — espaços incluídos. **Quem normaliza é o
+			 * servidor**, que tira tudo o que não é dígito: um campo que recuse um espaço obriga
+			 * quem tem o NIF escrito num papel com espaços a adivinhar o que a app quer.
+			 *
+			 * `inputmode="numeric"` traz o teclado numérico no telemóvel sem impedir a colagem de um
+			 * valor com espaços, que é o que `type="number"` faria.
+			 */
+			#nif {
+				font-family: inherit;
+				font-size: 28px;
+				letter-spacing: 0.08em;
+				text-align: center;
+				padding: 16px;
+				border-radius: 10px;
+				border: 2px solid #3a3a3a;
+				background: #1a1a1a;
+				color: var(--n-000);
+			}
+
+			#nif:focus-visible {
+				outline: 3px solid var(--marca-amarelo);
+				outline-offset: 2px;
+			}
+
+			#entrar {
+				font-family: inherit;
+				font-size: 22px;
+				font-weight: 700;
+				padding: 16px;
+				border: 0;
+				border-radius: 10px;
+				background: var(--marca-amarelo);
+				/* Amarelo é fundo; sobre ele o texto é escuro. Nunca o contrário. Ver docs/design.md. */
+				color: #0f0f0f;
+				cursor: pointer;
+			}
+
+			#entrar[disabled] {
+				opacity: 0.5;
+				cursor: default;
+			}
+
+			/*
+			 * A resposta por baixo. `aria-live` para quem usa leitor de ecrã ouvir o resultado sem
+			 * ter de ir à procura dele — é o único conteúdo desta página que muda sozinho.
+			 */
+			.resposta {
+				min-height: 4em;
+				text-align: center;
+				font-size: 20px;
+				line-height: 1.4;
+			}
+
+			.resposta b {
+				display: block;
+				font-size: 30px;
+				font-weight: 700;
+			}
+
+			.resposta[data-estado='erro'] {
+				color: #ff7a6e;
+			}
 		</style>
 	</head>
 	<body>
@@ -86,6 +167,14 @@
 			que é o que um leitor de ecrã precisa de dizer.
 		-->
 		<img class="logotipo" src="/img/refood_logo_horizontal_fundo_escuro.svg" alt="Refood" />
+
+		<form class="entrada" id="entrada">
+			<label for="nif">Escreve o teu NIF</label>
+			<input id="nif" name="nif" inputmode="numeric" autocomplete="off" placeholder="000 000 000" />
+			<button id="entrar" type="submit">Entrar</button>
+		</form>
+
+		<p class="resposta" id="resposta" role="status" aria-live="polite"></p>
 
 		<script>
 			/*
@@ -102,6 +191,61 @@
 					navigator.serviceWorker.register('/sw.js').catch(() => {});
 				});
 			}
+
+			/*
+			 * A entrada. Manda o NIF tal como foi escrito — **quem normaliza é o servidor**, que é
+			 * também quem decide se há ficha. O ecrã não valida nada para lá de não deixar mandar
+			 * um campo vazio: uma segunda regra aqui era uma segunda regra para manter.
+			 *
+			 * Tudo por `textContent`: o nome vem do Odoo, e nome de pessoa nunca se interpola em
+			 * marcação.
+			 */
+			const entrada = document.getElementById('entrada');
+			const campo = document.getElementById('nif');
+			const botao = document.getElementById('entrar');
+			const resposta = document.getElementById('resposta');
+
+			function mostrar(estado, texto, destaque) {
+				resposta.replaceChildren();
+				resposta.dataset.estado = estado;
+
+				if (destaque) {
+					const b = document.createElement('b');
+					b.textContent = destaque;
+					resposta.append(b);
+				}
+				resposta.append(document.createTextNode(texto));
+			}
+
+			entrada.addEventListener('submit', async (evento) => {
+				evento.preventDefault();
+				if (campo.value.trim() === '') return;
+
+				botao.disabled = true;
+				mostrar('', 'A procurar…');
+
+				try {
+					const pedido = await fetch('/api/entrar', {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ nif: campo.value }),
+					});
+					const corpo = await pedido.json();
+
+					if (corpo.ok) {
+						mostrar('ok', corpo.nucleo ?? '', `Olá, ${corpo.nome ?? ''}`);
+						campo.value = '';
+					} else {
+						mostrar('erro', corpo.mensagem ?? 'Não foi possível entrar.');
+					}
+				} catch {
+					// Sem rede, ou o Worker em baixo. Não se distingue, e para quem está à frente do
+					// telemóvel a resposta é a mesma: tentar outra vez.
+					mostrar('erro', 'Sem ligação. Tenta outra vez.');
+				} finally {
+					botao.disabled = false;
+				}
+			});
 		</script>
 	</body>
 </html>

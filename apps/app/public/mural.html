@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="pt-PT">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Refood — mural</title>
+
+		<link rel="icon" href="/img/favicon.ico" sizes="any" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<meta name="theme-color" content="#0f0f0f" />
+
+		<!--
+			**Fora do índice.** É um ecrã de apresentação, com primeiros nomes de pessoas reais, e não
+			tem por que aparecer numa pesquisa. Não substitui controlo de acesso nenhum — o que fecha
+			isto é o interruptor da entrada, do lado do servidor.
+		-->
+		<meta name="robots" content="noindex, nofollow" />
+
+		<style>
+			/*
+			 * O mural: projectado num PC, visto de longe por uma sala.
+			 *
+			 * **Não tem interacção nenhuma, e isso é o requisito.** Nada focável, nenhum `<button>`,
+			 * nenhum `<a>`, nenhum campo — quem está à frente do projector não é quem o opera, e um
+			 * elemento focável num ecrã projectado é um elemento que alguém carrega por engano.
+			 *
+			 * Mesmo fundo da página de entrada, pela mesma razão: é a mesma demonstração. Não é uma
+			 * decisão sobre o aspecto da PWA — ver o CLAUDE.md desta app.
+			 */
+			* {
+				box-sizing: border-box;
+				margin: 0;
+			}
+
+			html,
+			body {
+				height: 100%;
+			}
+
+			body {
+				background: var(--n-950);
+				color: var(--n-000);
+				font-family: var(--fonte);
+				font-weight: 500; /* sobre fundo escuro, o 400 esvai-se a alguns metros */
+				display: grid;
+				grid-template-rows: auto 1fr;
+				overflow: hidden;
+			}
+
+			header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 24px;
+				padding: 24px 32px;
+				border-bottom: 2px solid #2b2b2b;
+			}
+
+			header img {
+				height: 44px;
+			}
+
+			.conta {
+				font-size: 24px;
+				color: #9a9a9a;
+			}
+
+			.conta b {
+				color: var(--marca-amarelo);
+				font-size: 32px;
+			}
+
+			/* Núcleos à esquerda, nomes na área principal. */
+			.corpo {
+				display: grid;
+				grid-template-columns: minmax(220px, 22%) 1fr;
+				min-height: 0;
+			}
+
+			.nucleos {
+				border-right: 2px solid #2b2b2b;
+				padding: 24px 0;
+				overflow: hidden;
+			}
+
+			.nucleos div {
+				padding: 10px 32px;
+				font-size: 26px;
+				color: #d6d6d6;
+			}
+
+			.nucleos div span {
+				color: #5a5a5a;
+				font-size: 20px;
+				margin-left: 8px;
+			}
+
+			.nomes {
+				padding: 24px 32px;
+				overflow: hidden;
+			}
+
+			.grupo {
+				margin-bottom: 28px;
+			}
+
+			.grupo h2 {
+				font-size: 22px;
+				font-weight: 700;
+				color: var(--marca-amarelo);
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				margin-bottom: 10px;
+			}
+
+			/*
+			 * Os nomes em colunas que se enchem sozinhas. Sem paginar e sem esconder: se um dia não
+			 * couberem, transbordam à vista num ecrã de teste em vez de desaparecerem em silêncio.
+			 */
+			.grupo ul {
+				list-style: none;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 10px 20px;
+			}
+
+			.grupo li {
+				font-size: 32px;
+				background: #1a1a1a;
+				border-left: 6px solid var(--marca-amarelo);
+				border-radius: 6px;
+				padding: 8px 16px;
+			}
+
+			.vazio {
+				display: grid;
+				place-items: center;
+				height: 100%;
+				font-size: 28px;
+				color: #5a5a5a;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<img src="/img/refood_logo_horizontal_fundo_escuro.svg" alt="Refood" />
+			<span class="conta" id="conta"></span>
+		</header>
+
+		<div class="corpo">
+			<div class="nucleos" id="nucleos"></div>
+			<div class="nomes" id="nomes">
+				<p class="vazio" id="vazio">À espera…</p>
+			</div>
+		</div>
+
+		<script>
+			/*
+			 * **O `/mural` simples nunca limpa.** Se limpasse ao abrir, um recarregamento a meio da
+			 * sessão — ou um segundo portátil no mesmo endereço — apagava o que já lá estava, com a
+			 * sala toda a ver. O reinício é deliberado: só com `?reiniciar` no endereço.
+			 *
+			 * Depois de reiniciar, o parâmetro é tirado do endereço com `replaceState`, para um F5
+			 * a seguir não voltar a limpar.
+			 */
+			const SONDA_MS = 5000;
+
+			async function reiniciarSePedido() {
+				if (!new URLSearchParams(location.search).has('reiniciar')) return;
+
+				await fetch('/api/mural/reiniciar', { method: 'POST' }).catch(() => {});
+				history.replaceState(null, '', location.pathname);
+			}
+
+			/** Tudo por `textContent`: são nomes de pessoas, vindos do Odoo. Nunca `innerHTML`. */
+			function desenhar(mural) {
+				const nucleos = document.getElementById('nucleos');
+				const nomes = document.getElementById('nomes');
+				const vazio = document.getElementById('vazio');
+				const conta = document.getElementById('conta');
+
+				conta.replaceChildren();
+				if (mural.total > 0) {
+					const b = document.createElement('b');
+					b.textContent = mural.total;
+					conta.append(b, document.createTextNode(mural.total === 1 ? ' pessoa' : ' pessoas'));
+				}
+
+				// Só os núcleos que já têm alguém: a lista cresce à medida que a sala entra.
+				nucleos.replaceChildren();
+				for (const n of mural.nucleos) {
+					const linha = document.createElement('div');
+					linha.textContent = n.nucleo;
+
+					const quantos = document.createElement('span');
+					quantos.textContent = n.nomes.length;
+					linha.append(quantos);
+					nucleos.append(linha);
+				}
+
+				nomes.replaceChildren();
+				if (mural.nucleos.length === 0) {
+					vazio.textContent = 'À espera…';
+					nomes.append(vazio);
+					return;
+				}
+
+				for (const n of mural.nucleos) {
+					const grupo = document.createElement('div');
+					grupo.className = 'grupo';
+
+					const titulo = document.createElement('h2');
+					titulo.textContent = n.nucleo;
+					grupo.append(titulo);
+
+					const lista = document.createElement('ul');
+					for (const nome of n.nomes) {
+						const item = document.createElement('li');
+						item.textContent = nome;
+						lista.append(item);
+					}
+
+					grupo.append(lista);
+					nomes.append(grupo);
+				}
+			}
+
+			async function sondar() {
+				try {
+					const pedido = await fetch('/api/mural');
+					const corpo = await pedido.json();
+					if (corpo.ok) desenhar(corpo.mural);
+				} catch {
+					// Uma falha de rede não apaga o que está no ecrã: fica o último estado bom até a
+					// sonda seguinte. Um mural que pisca a vazio de cinco em cinco segundos é pior do
+					// que um mural com cinco segundos de atraso.
+				}
+			}
+
+			// Numa função e não com `await` de topo, que exigiria `type="module"` — e um script de
+			// módulo é diferido e com escopo próprio, o que muda mais do que o que aqui se precisa.
+			(async () => {
+				await reiniciarSePedido();
+				await sondar();
+				setInterval(sondar, SONDA_MS);
+			})();
+		</script>
+	</body>
+</html>

@@ -2,15 +2,17 @@ import { describe, expect, it } from 'vitest';
 import worker from '../src/index';
 
 /**
- * **O `fetch` recebe só o pedido, e o teste chama-o assim.**
+ * **Um `Env` vazio, e chega para o que este ficheiro testa.**
  *
- * O `Env` desta app está vazio — sem Odoo, sem D1, sem KV — e o Worker não declara o parâmetro que
- * não usa. Não é economia de escrita: no dia em que houver uma ligação, o `env` entra na assinatura
- * e **este ficheiro deixa de compilar**, que é o sítio certo para se dar por isso. Um teste que
- * passasse um `{} as Env` a mais aceitava a mudança em silêncio.
+ * O `env` entrou na assinatura quando a app ganhou o Odoo e o D1 — e este ficheiro deixou de
+ * compilar, que era o sítio certo para se dar por isso. Os caminhos que aqui se exercitam — a sonda
+ * de saúde e os 404 — não lhe tocam; quem depende de ligações a sério é testado em `entrar.test.ts`
+ * e `mural.test.ts`, com um D1 verdadeiro por baixo.
  */
+const ENV = {} as Env;
+
 const pedir = (caminho: string, metodo = 'GET') =>
-	worker.fetch(new Request(`https://app-staging.myrefood.pt${caminho}`, { method: metodo }));
+	worker.fetch(new Request(`https://app-staging.myrefood.pt${caminho}`, { method: metodo }), ENV);
 
 describe('o Worker da PWA', () => {
 	it('responde à sonda de saúde, e só com a hora', async () => {

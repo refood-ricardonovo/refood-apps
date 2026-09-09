@@ -1,0 +1,6 @@
+# Copia para .dev.vars e preenche. Em producao usa: wrangler secret put ODOO_USERNAME
+ODOO_USERNAME=""
+ODOO_PASSWORD=""
+# O interruptor da demonstracao. "aberta" abre; qualquer outra coisa, e a ausencia, fecha.
+# Liga-se no dia da apresentacao e desliga-se a seguir: wrangler secret put ENTRADA_ABERTA
+ENTRADA_ABERTA=""
