@@ -421,18 +421,21 @@
 				--colunas: 5;
 				--largura: 300px;
 				--numero: 64px;
+				--kg: 42px;
 				--detalhe: 32px;
 			}
 			.grelha[data-densidade='normal'] {
 				--colunas: 7;
 				--largura: 248px;
 				--numero: 52px;
+				--kg: 32px;
 				--detalhe: 28px;
 			}
 			.grelha[data-densidade='apertada'] {
 				--colunas: 9;
 				--largura: 196px;
 				--numero: 44px;
+				--kg: 28px;
 				--detalhe: 24px;
 				--folga: 10px;
 				--respiro: 6px;
@@ -442,6 +445,7 @@
 				--colunas: 10;
 				--largura: 180px;
 				--numero: 40px; /* o mínimo absoluto do `design.md` para um televisor */
+				--kg: 24px;
 				--detalhe: 20px; /* abaixo do chão de 32px: ver a nota acima */
 				--folga: 8px;
 				--respiro: 4px;
@@ -503,6 +507,7 @@
 				--largura: 600px;
 				--altura: 190px;
 				--nome: 34px;
+				--kg: 42px;
 				--detalhe: 26px;
 			}
 			.grelha[data-area='recolhas'][data-densidade='normal'] {
@@ -510,6 +515,7 @@
 				--largura: 372px;
 				--altura: 124px; /* 30 fontes ÷ 5 = 6 linhas */
 				--nome: 26px;
+				--kg: 32px;
 				--detalhe: 21px;
 			}
 			/*
@@ -522,6 +528,7 @@
 				--largura: 306px;
 				--altura: 106px; /* 42 fontes ÷ 6 = 7 linhas */
 				--nome: 22px;
+				--kg: 28px;
 				--detalhe: 18px;
 				--folga: 10px;
 				--respiro: 6px;
@@ -531,6 +538,7 @@
 				--largura: 260px;
 				--altura: 73px; /* até 70 fontes ÷ 7 = 10 linhas */
 				--nome: 19px;
+				--kg: 24px;
 				--detalhe: 16px;
 				--folga: 8px;
 				--respiro: 2px;
@@ -699,38 +707,31 @@
 			 * Alinhado à direita e sem `wrap`: o número cresce para a esquerda e nunca parte em duas
 			 * linhas.
 			 *
-			 * **O corpo é o do número da família — 64px — e isso só serve nas entregas.** Ali a coluna
-			 * 1 tem quatro caracteres (`B412`) e sobra largura; nas recolhas tem o número **e o nome
-			 * da fonte**, que é o segundo eixo de leitura e chega aos 55 caracteres. Ver o degrau das
-			 * recolhas a seguir.
+			 * **O corpo é o `--kg`, e é o mesmo em qualquer cartão** — família, fonte ou parceiro de
+			 * apoio, entrega programada ou extra. Quem olha para um ecrã lê os quilos como uma só
+			 * grandeza, e um mesmo número que aparecesse maior num cartão do que noutro sugeria uma
+			 * diferença que não existe.
+			 *
+			 * **Tem variável própria, e essa é a correcção.** O peso já saiu duas vezes ao lado por
+			 * ser derivado do identificador de cada área — do `--numero` das entregas, que o punha a
+			 * 64px numa coluna que não tem essa largura, e depois do `--nome` das recolhas, que
+			 * simplesmente não existe do lado das entregas. O tamanho dos quilos não é função do
+			 * tamanho do identificador; é uma decisão sua, e agora tem onde ser escrita.
+			 *
+			 * Escala com a densidade — 42/32/28/24 — porque a densidade é propriedade da grelha e não
+			 * do cartão. O valor é o mesmo degrau a degrau nas duas áreas: os quatro números estão
+			 * nos blocos de densidade, lado a lado com as outras medidas que ali se decidem.
+			 *
+			 * **Continua a ser o elemento mais forte do cartão**, porque é o único a bold e a cores;
+			 * deixa é de competir com o identificador, que é quem manda na coluna 1.
 			 */
 			.peso {
-				font-size: var(--numero, 64px);
+				font-size: var(--kg, 32px);
 				font-weight: var(--peso-destaque);
 				line-height: 1;
 				color: var(--cor);
 				white-space: nowrap;
 				text-align: right;
-			}
-
-			/*
-			 * **Nas recolhas o peso é muito mais pequeno, e não é preferência — era um erro.**
-			 *
-			 * As densidades das recolhas nunca definem `--numero`: essa variável é o corpo do número
-			 * da família, das entregas. O `.peso` caía no valor por omissão de **64px**, e um número
-			 * desse tamanho na coluna 2 comia a largura da coluna 1 — o nome partia-se em três linhas
-			 * e a hora saía pelo fundo do cartão, que tem `max-height`. "125 kg" empurrava
-			 * "Pingo Doce Cova Piedade" para fora do seu próprio cartão.
-			 *
-			 * Prende-se ao `--nome`, que é a variável que escala com a densidade, e não a um número
-			 * fixo: a 26px de nome dá ~32px de peso — o mesmo corpo do total no cabeçalho — e nos
-			 * degraus apertados encolhe com o resto, sem outra tabela para manter.
-			 *
-			 * **Continua a ser o elemento mais forte do cartão**, porque é o único a bold e a cores;
-			 * deixa é de competir com o identificador, que ali é quem manda.
-			 */
-			.grelha[data-area='recolhas'] .peso {
-				font-size: calc(var(--nome, 26px) * 1.25);
 			}
 
 			/*
@@ -741,11 +742,11 @@
 			 * ao lado de um número de 24px é a unidade a competir com o número, que é o contrário do
 			 * que se quer.
 			 *
-			 * **O que isto aceita:** no degrau mais cheio das recolhas a unidade fica com ~9px, e a
-			 * essa distância não se distingue `kg` de `T`. Um cartão em toneladas exige 1 000 kg numa
-			 * fonte, o que na base são **5 cartões em 6 092** — e nesses o número em si já é
-			 * inconfundível (`1,2` contra `125`). Se algum dia incomodar num ecrã real, o sítio de
-			 * mexer é aqui.
+			 * **O que isto aceita:** no degrau mais cheio a unidade fica com ~9,6px — nas duas áreas,
+			 * agora que o corpo é o mesmo —, e a essa distância não se distingue `kg` de `T`. Um
+			 * cartão em toneladas exige 1 000 kg num destino só, o que na base são **5 cartões em
+			 * 6 092** — e nesses o número em si já é inconfundível (`1,2` contra `125`). Se algum dia
+			 * incomodar num ecrã real, o sítio de mexer é aqui.
 			 */
 			.peso small {
 				font-size: 0.4em;
@@ -774,27 +775,28 @@
 			 *
 			 * Um cartão de extra está *entregue* ou com *falta* como qualquer outro — o verde e o
 			 * vermelho continuam a querer dizer o mesmo, e trocá-los por uma terceira cor obrigava a
-			 * quem olha a aprender que ali o verde deixou de ser verde. O que muda é **o que ele não
-			 * tem**: um extra não estava na escala do dia, portanto não tem hora combinada.
+			 * quem olha a aprender que ali o verde deixou de ser verde.
 			 *
-			 * Essa ausência sozinha não chegava. Um cartão sem hora já existe por outra razão —
-			 * horário por preencher, 19 rotas de recolha da base —, e os dois liam-se igual. Por isso
-			 * a palavra ocupa o lugar da hora: diz o que o cartão é, no sítio exacto onde a diferença
-			 * está, e não gasta uma linha nova num ecrã que não tem linhas a mais.
+			 * **O que o marca é a barra da esquerda, e mais nada.** A barra grossa é o que já se lê
+			 * de longe em qualquer cartão; a ponteada é a mesma barra com outra textura, e distingue
+			 * sem gastar cor, sem gastar espaço e sem competir com o estado. Chegou a haver ali a
+			 * palavra *EXTRA*, no lugar da hora: dizia o mesmo duas vezes e tirava a linha ao nome do
+			 * parceiro, que é quem precisa dela.
 			 *
-			 * O amarelo é o acento da marca sobre escuro, o mesmo do número das recolhas. A borda
-			 * ponteada repete a mesma coisa em forma, para quem não distinga a cor.
+			 * O que isto aceita: nas recolhas há cartões sem hora por horário por preencher — 19
+			 * rotas em 801 —, e a essa distância o que os separa de um extra é só a textura da barra.
+			 * É pouco, e é suficiente porque um extra é raro e o cartão fica no fim da grelha.
 			 */
 			.cartao[data-extra='sim'] {
 				border-left-style: dotted;
 			}
 
-			.extra {
-				color: var(--marca-amarelo);
-				font-weight: var(--peso-destaque);
-				text-transform: uppercase;
-				letter-spacing: 0.08em;
-			}
+			/*
+			 * **Um extra não tem tamanho de peso próprio, e é de propósito.** Houve aqui uma regra
+			 * a encolher os quilos só nos extras, e estava errada pelo motivo certo: o que estava
+			 * grande de mais não era o extra, era o peso das entregas todas. Corrigiu-se onde o
+			 * problema estava — no `.peso`, agora com `--kg` —, e este caso especial desapareceu.
+			 */
 
 			/* ----------------------------------------------------------- notas (PWA) */
 
@@ -1162,11 +1164,12 @@
 			}
 
 			/**
-			 * O primeiro campo da linha de detalhe: **a hora, ou a palavra que a substitui**.
+			 * O primeiro campo da linha de detalhe: **a hora, quando há**.
 			 *
-			 * Um extra não estava na escala do dia e por isso não tem hora combinada nenhuma. A
-			 * palavra ocupa o lugar dela porque é aí que está a diferença — e porque um cartão
-			 * simplesmente sem hora já existe por outra razão (horário por preencher) e leria igual.
+			 * Um extra não estava na escala do dia e não tem hora nenhuma para mostrar. Nada ocupa o
+			 * lugar dela — quem diz que o cartão é um extra é a barra ponteada da esquerda, e uma
+			 * palavra ali dizia o mesmo uma segunda vez, à custa da linha que o nome do parceiro
+			 * precisa.
 			 *
 			 * O `semHora` é o que as duas áreas fazem de diferente quando não há hora: as recolhas
 			 * põem um travessão, porque a hora é a ordem do trabalho e a falta dela é informação; as
@@ -1174,13 +1177,6 @@
 			 * dos cartões é ruído. Devolve `null` quando não há nada a acrescentar.
 			 */
 			function marcaDaEscala(cartao, semHora) {
-				if (cartao.extra) {
-					const extra = document.createElement('span');
-					extra.className = 'extra';
-					extra.textContent = 'extra';
-					return extra;
-				}
-
 				if (cartao.hora === null && semHora === null) return null;
 
 				const hora = document.createElement('span');

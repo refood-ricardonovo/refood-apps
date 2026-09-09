@@ -284,8 +284,9 @@ o levantamento à frente, não um descuido.
 - Nos televisores, primeiro nome e inicial do apelido. Nada mais. **Isto é sobre pessoas
   singulares:** o nome de uma **entidade** — uma fonte de alimento, um parceiro de apoio — não é
   dado pessoal e aparece. Sai sempre do `name` da ficha, nunca do `client_name` nem do
-  `res.partner`, e **num parceiro de apoio vão só as duas primeiras palavras**, porque nada no
-  modelo obriga a que um parceiro seja uma instituição. Ver
+  `res.partner`, e **num parceiro de apoio vão só as duas primeiras palavras** — três quando a
+  segunda é um traço, que é a forma `SIGLA - Nome` —, porque nada no modelo obriga a que um
+  parceiro seja uma instituição. Ver
   [`docs/modelos/parceiros-apoio.md`](docs/modelos/parceiros-apoio.md).
 - Não ler dados pessoais sensíveis sem razão escrita na rota. Estão na mesma tabela que o resto.
 - Os consentimentos da ficha não são um interruptor de permissões. Não os consultar como tal.

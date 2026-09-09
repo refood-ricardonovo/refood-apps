@@ -122,7 +122,7 @@ export interface CartaoRecolha {
 	readonly nome: string | null;
 	/**
 	 * A hora recomendada da recolha. **`null` nos extras**: não estavam na escala do dia, portanto
-	 * não há hora recomendada nenhuma, e é essa ausência que o ecrã usa para os marcar.
+	 * não há hora recomendada nenhuma. Quem os marca no ecrã é a barra ponteada da esquerda.
 	 */
 	readonly hora: string | null;
 	readonly estado: EstadoRecolha;

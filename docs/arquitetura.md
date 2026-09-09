@@ -374,9 +374,9 @@ Quatro coisas que a base não dá, e como se resolveram:
   total do turno** — decisão tomada com o número à frente, não um efeito lateral.
 - **Um extra não é um estado.** Está sempre _entregue_/_recolhido_ ou _falta_, nunca _por
   entregar_ — é a encomenda que o faz existir. Viaja como campo à parte do cartão, mantém a cor do
-  estado, e o que o marca no ecrã é **a palavra `extra` no lugar da hora**: não estava na escala,
-  portanto não tem hora combinada, e a ausência sozinha lia-se como "horário por preencher", que é
-  um caso que já existe.
+  estado, e o que o marca no ecrã é **a barra ponteada da esquerda**: a barra grossa já se lê de
+  longe em qualquer cartão, e a textura distingue sem gastar cor nem espaço. Não leva hora — não
+  estava na escala —, e a linha que sobra é a que o nome do parceiro de apoio ocupa.
 
 **O nome de um parceiro de apoio aparece no televisor, e é uma excepção sobre a espécie do dado.**
 Um `res.support.partner` é uma instituição que recebe alimentos — da mesma espécie que a fonte de
@@ -386,6 +386,12 @@ identificar e é o que sobra se algum dia alguém criar um parceiro que seja uma
 coisa que nada no modelo impede (651 dos 1 014 nem têm tipo, e o campo por onde um beneficiário
 aponta ao parceiro que o acompanha diz "tipicamente a assistente social"). Vai ao lado do número
 `P12`, porque duas palavras podem colidir — dois "Centro Social" lêem-se como um cartão repetido.
+
+**A excepção do traço**, encontrada num televisor: há nomes na forma `SIGLA - Nome por extenso`, e
+o corte a duas palavras dava _"ARPILF -"_ — um traço pendurado no lugar da informação. Quando a
+segunda palavra é só um traço entra a terceira, e o limite de exposição aguenta-o: **o nome de uma
+pessoa não leva um traço isolado em segundo lugar**, portanto a palavra a mais só se ganha em nomes
+que já eram de entidade.
 
 **Custo medido:** as recolhas ganham os extras **sem leitura nenhuma a mais** — a `res.food.source`
 já era lida e a mesma consulta passou a responder às duas perguntas, com um `|` no domínio. As

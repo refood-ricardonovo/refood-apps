@@ -133,6 +133,32 @@ describe('o nome curto de um parceiro de apoio', () => {
 		expect(nomeCurtoDoParceiro('Cáritas')).toBe('Cáritas');
 	});
 
+	/**
+	 * **A excepção do traço.** Há nomes na forma `SIGLA - Nome por extenso`, e o corte a duas
+	 * palavras dava *"ARPILF -"* — um traço pendurado onde devia estar a informação. Visto num
+	 * televisor.
+	 */
+	it('leva a terceira palavra quando a segunda é um traço', () => {
+		expect(nomeCurtoDoParceiro('ARPILF - Associação de Reformados')).toBe('ARPILF - Associação');
+	});
+
+	/** Os três traços que aparecem em texto dão o mesmo cartão partido, e recebem o mesmo remédio. */
+	it('conta o traço curto, o meio-risco e o travessão', () => {
+		expect(nomeCurtoDoParceiro('ARPILF – Associação de Reformados')).toBe('ARPILF – Associação');
+		expect(nomeCurtoDoParceiro('ARPILF — Associação de Reformados')).toBe('ARPILF — Associação');
+	});
+
+	/** Sem terceira palavra o traço ficava a sugerir que faltava ali qualquer coisa. */
+	it('corta o traço que fique no fim', () => {
+		expect(nomeCurtoDoParceiro('ARPILF -')).toBe('ARPILF');
+		expect(nomeCurtoDoParceiro('-')).toBeNull();
+	});
+
+	/** Um traço no meio de um nome de duas palavras não é separador de sigla: fica como está. */
+	it('não mexe num traço que não esteja em segundo lugar', () => {
+		expect(nomeCurtoDoParceiro('Centro Social - Benfica')).toBe('Centro Social');
+	});
+
 	/** Há nomes com espaço duplo e com espaço nas pontas: sem colapsar, a segunda palavra saía vazia. */
 	it('colapsa o espaço antes de cortar', () => {
 		expect(nomeCurtoDoParceiro('  Centro   Social  de X ')).toBe('Centro Social');

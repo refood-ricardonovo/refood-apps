@@ -206,8 +206,9 @@ export interface CartaoEntrega {
 	 */
 	readonly nome: string | null;
 	/**
-	 * A hora combinada da entrega. **`null` nos extras**, e é isso que os distingue no ecrã: um
-	 * extra não estava na escala do dia, portanto não tem hora combinada para mostrar.
+	 * A hora combinada da entrega. **`null` nos extras**: um extra não estava na escala do dia,
+	 * portanto não há hora combinada nenhuma para mostrar. Quem o distingue no ecrã é a barra
+	 * ponteada da esquerda, não esta ausência.
 	 */
 	readonly hora: string | null;
 	readonly adultos: number | null;
@@ -373,7 +374,8 @@ export function ordemDoParceiro(valor: unknown): number | null {
 }
 
 /**
- * O nome de um parceiro de apoio como vai ao ecrã: **as duas primeiras palavras, e mais nada**.
+ * O nome de um parceiro de apoio como vai ao ecrã: **as duas primeiras palavras** — três, quando a
+ * segunda é um traço.
  *
  * **Não é só para caber.** É a única coisa que este painel mostra que veio de um campo `name`, e o
  * corte é o que garante que continua a ser uma identificação e não uma ficha: `res.support.partner`
@@ -381,6 +383,19 @@ export function ordemDoParceiro(valor: unknown): number | null {
  * seja uma instituição** — 651 dos 1 014 nem têm tipo preenchido, e o campo por onde um beneficiário
  * aponta ao parceiro que o acompanha diz "tipicamente a assistente social". Duas palavras chegam
  * para dizer *Centro Paroquial* e não chegam para dizer o nome completo de ninguém.
+ *
+ * **A excepção do traço, e porque é que não abre a regra.** Há nomes na forma `SIGLA - Nome por
+ * extenso`, e nesses o corte a duas palavras dava *"ARPILF -"*: um traço pendurado onde devia estar
+ * a informação, visto num televisor. Quando a segunda palavra é só um traço, entra a terceira. O
+ * limite de exposição aguenta-o — **o nome de uma pessoa não leva um traço isolado em segundo
+ * lugar**, portanto a terceira palavra só se ganha em nomes que já eram de entidade.
+ *
+ * Contam-se os três traços que aparecem em texto — `-`, `–` e `—` —, porque quem escreve um nome
+ * numa ficha do Odoo usa o que o teclado ou a colagem lhe deu, e os três produzem exactamente o
+ * mesmo cartão partido.
+ *
+ * Um traço que fique no fim por não haver terceira palavra é cortado: `ARPILF -` mostra-se
+ * *ARPILF*, que identifica, em vez de sugerir que falta ali qualquer coisa.
  *
  * **Duas palavras podem colidir** — dois "Centro Social" no mesmo ecrã lêem-se como um cartão
  * repetido. É por isso que a etiqueta `P12` fica ao lado: são os dois o identificador, como o
@@ -393,7 +408,13 @@ export function nomeCurtoDoParceiro(valor: unknown): string | null {
 	if (typeof valor !== 'string') return null;
 
 	const palavras = valor.trim().split(/\s+/).filter(Boolean);
-	return palavras.length > 0 ? palavras.slice(0, 2).join(' ') : null;
+	const ehTraco = (palavra: string | undefined) => palavra === '-' || palavra === '–' || palavra === '—';
+
+	const curto = palavras.slice(0, ehTraco(palavras[1]) ? 3 : 2);
+	// Sem terceira palavra, o traço ficava pendurado no fim do cartão.
+	while (curto.length > 0 && ehTraco(curto[curto.length - 1])) curto.pop();
+
+	return curto.length > 0 ? curto.join(' ') : null;
 }
 
 /**
@@ -550,7 +571,7 @@ async function lerFichas(
  *
  * Tudo o que ele mostra vem da **ficha**, e não de uma rota que não existe: o número, e as três
  * contagens do agregado. **Não leva hora** — não estava na escala do dia, portanto não há hora
- * combinada nenhuma para mostrar, e é essa ausência que o ecrã usa para o marcar.
+ * combinada nenhuma para mostrar. Quem o marca no ecrã é a barra ponteada da esquerda.
  */
 function cartaoDeBeneficiarioExtra(parceiro: number, ficha: BeneficiarioOdoo, resumo: ResumoDoBeneficiario): CartaoEntrega {
 	return {

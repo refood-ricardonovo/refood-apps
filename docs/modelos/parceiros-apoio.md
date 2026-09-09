@@ -131,6 +131,13 @@ O que a limita, e porque não é um cheque em branco:
   que um parceiro seja uma instituição** — 651 dos 1 014 não têm tipo, e o `support_partner_id` do
   beneficiário aponta "tipicamente a assistente social". Duas palavras chegam para _Centro
   Paroquial_ e não chegam para o nome completo de ninguém.
+- **Três palavras quando a segunda é um traço.** O `name` de vários parceiros tem a forma
+  `SIGLA - Nome por extenso`, e o corte a duas dava _"ARPILF -"_: um traço pendurado no lugar da
+  informação, visto num televisor. Contam os três traços que aparecem em texto — `-`, `–` e `—` —,
+  porque quem preenche uma ficha usa o que o teclado ou a colagem lhe deu. Um traço que fique no
+  fim por não haver terceira palavra é cortado. **A excepção não alarga o limite de exposição:** o
+  nome de uma pessoa não leva um traço isolado em segundo lugar, portanto a palavra a mais só se
+  ganha em nomes que já eram de entidade.
 - Vai **ao lado do número** `P12`, porque duas palavras colidem: dois "Centro Social" no mesmo ecrã
   lêem-se como um cartão repetido. Um quinto das fichas não tem número, e nessas fica o nome
   sozinho.
