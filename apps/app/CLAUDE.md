@@ -30,6 +30,20 @@ Two rules follow, and they are the same rule seen from both ends:
 - **The shortcut cannot be removed before the real login exists** — not because it would break the demo, but because the allowlist is the only thing standing between it and the oracle above. Take out the fence and what remains is the thing the fence was for.
 - **The allowlist cannot be widened while the shortcut lives.** Adding NIFs "just for this presentation", or turning it off to test, is not a smaller version of removing it — it is removing it, for as long as that lasts.
 
+## A NIF does not identify one ficha
+
+Measured against staging in September 2026, over the 5 772 active `hr.employee` records:
+
+**33 normalised values appear in more than one active ficha — up to three — and 14 of those cross núcleos.** So the route that resolves a NIF **always returns a list, and is never a `search_read` with `limit: 1`.** Taking the first row that comes back is not a simplification; it is picking a stranger, and for the 14 that cross núcleos it is picking the wrong núcleo too.
+
+**Normalising means stripping everything that is not a digit and requiring nine.** The 317 fichas whose `vat` carries interior spaces only match a typed number that way. **Normalisation creates no new collision:** the 39 colliding pairs already collided with the values exactly as stored, so the cleanup is pure gain and costs nothing in ambiguity. Verified in staging, September 2026.
+
+> **How the query gets shaped is still open**, and it follows from the line above: `vat` is stored (`store: true`, so it can sit in a domain), but a plain `['vat', '=', <typed digits>]` misses those 317 — the stored value is not the normalised one. Whoever writes the route decides that, and does not discover it late.
+
+**When the real login lands, the tie-break between fichas is the code sent to each one's `hr_email`:** whoever answers the code fixes both the ficha and the núcleo. **Never show the person the list of fichas or of núcleos that match a NIF** — that is the same oracle the allowlist exists to prevent, handed over one query at a time.
+
+**418 active fichas have no usable NIF and cannot come in this way** — no `vat` at all, or a value that is not nine digits once cleaned. That is roughly one active volunteer in fourteen, and they need recovery through their núcleo. A login that has no answer for them is a login that excludes them.
+
 ## The manifest declares `id` explicitly
 
 `"id": "/"`, and it is not the default it looks like. **When `id` is absent the system derives the app's identity from `start_url`** — so the day the app starts somewhere else (`/turnos`, say, or a start_url carrying a parameter) the phone stops recognising the installed app and treats the new one as a different app: a second icon, a second set of storage, and no way to migrate the person who had it installed.
