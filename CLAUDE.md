@@ -85,7 +85,7 @@ Facts about the protocol that the code encodes, and that any change must preserv
 - The protocol is stateless: every `object.execute_kw` resends db + uid + password. The client caches the `uid` promise per instance (so concurrent first calls authenticate once) and retries a call once after re-authenticating if a cached uid stopped working — but only when the fresh uid actually differs, since an identical uid means a permissions problem that a retry would only repeat.
 - The client's `context` is merged under any per-call `context`, so a call can override `tz` or a business flag without losing the defaults.
 - **`lang` is a required parameter of every read, and it is refused in the client's config** — both in `OdooConfig.context` and inside a per-call `context`. Without `lang` Odoo does **not** fall back to the user's language: it reads `en_US`, and nothing about the response says so. It is a per-read parameter and not client state because the client is shared by the isolate: a language fixed at construction becomes a property of the process, which is harmless on the TV (always `pt_PT`) and wrong on the PWA, where two volunteers with different languages can be served by the same isolate. See `OdooLangOptions`.
-- **Never compare or filter by a translated name — compare ids or codes.** 20 of the 24 POS products hold unrelated names across the two languages: the product meaning "no surplus" is called *Falta Justificada (cópia)* in `en_US`. Field labels from `fields_get` are translated too (`company_id` is *Center* in `en_US`, *Núcleo* in `pt_PT`). Selection **values** are not translated; their labels are.
+- **Never compare or filter by a translated name — compare ids or codes.** 20 of the 24 POS products hold unrelated names across the two languages: the product meaning "no surplus" is called _Falta Justificada (cópia)_ in `en_US`. Field labels from `fields_get` are translated too (`company_id` is _Center_ in `en_US`, _Núcleo_ in `pt_PT`). Selection **values** are not translated; their labels are.
 - There is deliberately **no `unlink` shortcut**: the apps do not delete Odoo records, and a public method would be easy to wire to a route by accident. `call(model, 'unlink', [ids])` still works, so the omission forces a decision rather than blocking one. A test asserts it stays off the prototype — do not "restore" it.
 
 `createOdooClient(env)` builds a client from the Worker `Env` and throws naming any missing variable. Create one per request — `Env` only exists inside `fetch`, and construction is free since authentication is lazy.
@@ -93,13 +93,13 @@ Facts about the protocol that the code encodes, and that any change must preserv
 `src/normalize.ts` holds the pure conversions between Odoo's serialization and idiomatic JS, and exists so those two conventions don't leak into business code:
 
 - Odoo uses `false` — never `null` — for "no value" in **any** field type. Hence `nullable`, `many2one`, `many2oneId`. Do not use `nullable` on a boolean field, where `false` is a real value.
-- Odoo serializes datetimes as `'2026-08-29 09:14:22'` and dates as `'2026-08-29'`, both **always UTC and with no timezone marker**. `odooDate` parses them with an explicit regex rather than `new Date(...)`, because JS engines read that space-separated format as *local* time — which would silently shift every timestamp by the runtime's offset. Date-only values become midnight UTC. Out-of-range or malformed input returns `null` rather than a rolled-over date.
+- Odoo serializes datetimes as `'2026-08-29 09:14:22'` and dates as `'2026-08-29'`, both **always UTC and with no timezone marker**. `odooDate` parses them with an explicit regex rather than `new Date(...)`, because JS engines read that space-separated format as _local_ time — which would silently shift every timestamp by the runtime's offset. Date-only values become midnight UTC. Out-of-range or malformed input returns `null` rather than a rolled-over date.
 - `toOdooDate` is the exact inverse, for writing timestamps back. It formats from UTC components and truncates sub-second precision, so `odooDate(toOdooDate(d))` round-trips to the second.
 
 ## Conventions
 
 - User-facing strings, code comments, and commit messages are in Portuguese (pt-PT); code identifiers are English. Match this when adding responses, comments, or commits.
-- The team's shorthand, which shows up in requests: **VL** = voluntários (`hr.employee`), **BF** = beneficiários (`res.beneficiary`), **FA** = fontes de alimentos (`res.food.source`), **PA** = parceiros de apoio (`res.support.partner`), **núcleos** = the Odoo companies (`res.company`). The full table, and the two that mislead — a volunteer is an *employee*, not a user; a núcleo is a *company* — are in `docs/modelos-odoo.md`.
+- The team's shorthand, which shows up in requests: **VL** = voluntários (`hr.employee`), **BF** = beneficiários (`res.beneficiary`), **FA** = fontes de alimentos (`res.food.source`), **PA** = parceiros de apoio (`res.support.partner`), **núcleos** = the Odoo companies (`res.company`). The full table, and the two that mislead — a volunteer is an _employee_, not a user; a núcleo is a _company_ — are in `docs/modelos-odoo.md`.
 - Secrets never go in `wrangler.jsonc` — its `vars` are public build-time values baked into the generated types. Use `.dev.vars` locally and `wrangler secret put` for deployed environments.
 
 # Instruções de projeto — Refood
@@ -131,9 +131,9 @@ estão nos ficheiros de conhecimento (`arquitetura.md`, `modelos-odoo.md` e os d
   `res.company`.** Vale para qualquer construção de `allowed_company_ids` e para qualquer sítio onde se
   ofereça um núcleo a escolher — não é uma regra do dropdown da sede. Em staging a base tem 87 empresas
   e o utilizador tem 84: as três de fora são legíveis em `res.company`, uma delas com nome de núcleo e
-  pendurada na empresa-mãe, e pedi-las em `allowed_company_ids` devolve `AccessError: Access to
-  unauthorized or invalid companies`. Uma lista que saia de `res.company` oferece o que a app não
-  consegue ler, e a falha aparece longe daqui — num televisor, semanas depois.
+  pendurada na empresa-mãe, e pedi-las em `allowed_company_ids` devolve
+  `AccessError: Access to unauthorized or invalid companies`. Uma lista que saia de `res.company`
+  oferece o que a app não consegue ler, e a falha aparece longe daqui — num televisor, semanas depois.
 - Não contar com o Odoo para filtrar. O utilizador de integração vê **todos os núcleos em operação**,
   e por isso as `ir.rule` não separam nada: a separação por núcleo é inteiramente trabalho do Worker.
   Mas "vê tudo" não é literal — o teto é o `company_ids`, e o que estiver fora dele responde como
@@ -153,11 +153,11 @@ estão nos ficheiros de conhecimento (`arquitetura.md`, `modelos-odoo.md` e os d
 - **Nunca nomes, emails ou moradas.** Uma pessoa ou entidade referencia-se pelo identificador da
   ficha, **por modelo** — e os dois campos que parecem servir de chave não servem:
 
-  | | Chave no D1 | Porquê |
-  |---|---|---|
-  | Voluntário | `barcode` | O código único da ficha |
-  | Beneficiário | `id` | O `number` identifica o **agregado**, não a pessoa, e não é único |
-  | Fonte de alimento | `id` | O `number` tem repetições |
+  |                   | Chave no D1 | Porquê                                                            |
+  | ----------------- | ----------- | ----------------------------------------------------------------- |
+  | Voluntário        | `barcode`   | O código único da ficha                                           |
+  | Beneficiário      | `id`        | O `number` identifica o **agregado**, não a pessoa, e não é único |
+  | Fonte de alimento | `id`        | O `number` tem repetições                                         |
 
 - **Toda a tabela operacional leva `company_id`.** Sem ele não há filtro por núcleo — é a mesma
   armadilha do `pos.order.line` e do `res.shift.log`, que não o têm. E o núcleo **nunca** se infere
@@ -269,7 +269,7 @@ o levantamento à frente, não um descuido.
   anulados. E **os estornos não abatem no mesmo dia** — há pares separados por 16 dias.
 - **Uma observação sobrepõe-se aos pesos**, e ao nível do cartão: um cartão com falta não mostra peso
   e contribui zero para o total, mesmo que a mesma entidade tenha uma entrega real no mesmo dia.
-- **As três observações não são todas faltas.** O `OBS-SEM-EXC` significa *tratado*. Classificar
+- **As três observações não são todas faltas.** O `OBS-SEM-EXC` significa _tratado_. Classificar
   pelo `default_code`, nunca pelo nome — que é traduzido e engana — nem pelo id, que não é portável
   entre bases. **Ler a categoria toda e tratar o desconhecido como falta:** errar para o lado
   visível.
