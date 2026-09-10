@@ -155,8 +155,34 @@
 				font-weight: 700;
 			}
 
-			.resposta[data-estado='erro'] {
+			/*
+			 * **O vermelho é só para o erro de formato**, que é uma correcção — o NIF são nove
+			 * dígitos, corrige e tenta.
+			 *
+			 * O "ainda não te encontrámos" fica **a branco**, como o resto do texto. Vai ser lido por
+			 * dezenas de pessoas ao mesmo tempo, numa sala, e uma em catorze fichas activas não tem
+			 * NIF utilizável: a vermelho lê-se como recusa, e não é uma recusa — é uma ficha por
+			 * completar, que o núcleo trata. Ver `semFicha`, em `entrar.ts`.
+			 */
+			.resposta[data-estado='formato'] {
 				color: #ff7a6e;
+			}
+
+			/*
+			 * **O `hidden` tem de ganhar a um `display` declarado.** O `.entrada` é `flex`, e uma
+			 * regra que declare `display` bate o `display: none` que o atributo traz da folha de
+			 * estilos do browser. Sem este `!important`, esconder o formulário não o esconde.
+			 */
+			[hidden] {
+				display: none !important;
+			}
+
+			.aviso {
+				text-align: center;
+				font-size: 24px;
+				line-height: 1.4;
+				color: #d6d6d6;
+				max-width: min(80vw, 460px);
 			}
 		</style>
 	</head>
@@ -168,13 +194,25 @@
 		-->
 		<img class="logotipo" src="/img/refood_logo_horizontal_fundo_escuro.svg" alt="Refood" />
 
-		<form class="entrada" id="entrada">
+		<!--
+			**A página nasce fechada, e é essa a versão certa quase sempre.**
+
+			A entrada por NIF é um atalho de uma apresentação; o estado normal, a partir do dia
+			seguinte, é fechado. Por isso o que está no HTML é a versão fechada, e o formulário só
+			aparece se o servidor disser que a porta está aberta — `GET /api/estado`.
+
+			Sai daqui de graça: o estado normal não pisca, sem JavaScript vê-se a versão certa em vez
+			de um formulário que não funcionaria, e com a API em baixo vê-se a mesma coisa.
+		-->
+		<p class="aviso" id="fechada">A app dos voluntários está a chegar.</p>
+
+		<form class="entrada" id="entrada" hidden>
 			<label for="nif">Escreve o teu NIF</label>
 			<input id="nif" name="nif" inputmode="numeric" autocomplete="off" placeholder="000 000 000" />
 			<button id="entrar" type="submit">Entrar</button>
 		</form>
 
-		<p class="resposta" id="resposta" role="status" aria-live="polite"></p>
+		<p class="resposta" id="resposta" role="status" aria-live="polite" hidden></p>
 
 		<script>
 			/*
@@ -204,6 +242,30 @@
 			const campo = document.getElementById('nif');
 			const botao = document.getElementById('entrar');
 			const resposta = document.getElementById('resposta');
+			const fechada = document.getElementById('fechada');
+
+			/*
+			 * **Quem decide qual das duas páginas se vê é o servidor.**
+			 *
+			 * A página abre fechada e só troca se o `/api/estado` disser que sim. Se o pedido falhar
+			 * — rede, Worker em baixo —, não se troca nada: fica a versão fechada, que é honesta em
+			 * qualquer dos casos e não é um formulário que não ia funcionar.
+			 */
+			async function abrirSePermitido() {
+				try {
+					const pedido = await fetch('/api/estado');
+					const corpo = await pedido.json();
+					if (!corpo.aberta) return;
+
+					fechada.hidden = true;
+					entrada.hidden = false;
+					resposta.hidden = false;
+				} catch {
+					// Fica fechada. Ver acima.
+				}
+			}
+
+			abrirSePermitido();
 
 			function mostrar(estado, texto, destaque) {
 				resposta.replaceChildren();
@@ -236,12 +298,14 @@
 						mostrar('ok', corpo.nucleo ?? '', `Olá, ${corpo.nome ?? ''}`);
 						campo.value = '';
 					} else {
-						mostrar('erro', corpo.mensagem ?? 'Não foi possível entrar.');
+						// O `erro` que o servidor devolve é o que escolhe a cor: só o `formato` sai a
+						// vermelho. Ver o CSS.
+						mostrar(corpo.erro ?? '', corpo.mensagem ?? 'Não foi possível entrar.', corpo.titulo);
 					}
 				} catch {
 					// Sem rede, ou o Worker em baixo. Não se distingue, e para quem está à frente do
 					// telemóvel a resposta é a mesma: tentar outra vez.
-					mostrar('erro', 'Sem ligação. Tenta outra vez.');
+					mostrar('', 'Sem ligação. Tenta outra vez.');
 				} finally {
 					botao.disabled = false;
 				}

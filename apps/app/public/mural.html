@@ -18,11 +18,15 @@
 
 		<style>
 			/*
-			 * O mural: projectado num PC, visto de longe por uma sala.
+			 * O mural: projectado num PC, numa sala com cerca de 300 pessoas, visto a dez metros.
 			 *
 			 * **Não tem interacção nenhuma, e isso é o requisito.** Nada focável, nenhum `<button>`,
 			 * nenhum `<a>`, nenhum campo — quem está à frente do projector não é quem o opera, e um
 			 * elemento focável num ecrã projectado é um elemento que alguém carrega por engano.
+			 *
+			 * **Duas metades com naturezas diferentes.** A coluna da esquerda é **estado**: quem está
+			 * na sala, por núcleo, e fica. A área principal é **acontecimento**: cada nome passa uma
+			 * vez, quando a pessoa entra, e desaparece. Nada se recicla para encher o ecrã.
 			 *
 			 * Mesmo fundo da página de entrada, pela mesma razão: é a mesma demonstração. Não é uma
 			 * decisão sobre o aspecto da PWA — ver o CLAUDE.md desta app.
@@ -41,7 +45,7 @@
 				background: var(--n-950);
 				color: var(--n-000);
 				font-family: var(--fonte);
-				font-weight: 500; /* sobre fundo escuro, o 400 esvai-se a alguns metros */
+				font-weight: 500; /* sobre fundo escuro, o 400 esvai-se a dez metros */
 				display: grid;
 				grid-template-rows: auto 1fr;
 				overflow: hidden;
@@ -52,92 +56,174 @@
 				align-items: center;
 				justify-content: space-between;
 				gap: 24px;
-				padding: 24px 32px;
+				padding: 20px 32px;
 				border-bottom: 2px solid #2b2b2b;
 			}
 
 			header img {
-				height: 44px;
+				height: 46px;
 			}
 
 			.conta {
-				font-size: 24px;
+				font-size: 26px;
 				color: #9a9a9a;
 			}
 
 			.conta b {
 				color: var(--marca-amarelo);
-				font-size: 32px;
+				font-size: 40px;
+				font-weight: 700;
 			}
 
-			/* Núcleos à esquerda, nomes na área principal. */
 			.corpo {
 				display: grid;
-				grid-template-columns: minmax(220px, 22%) 1fr;
+				grid-template-columns: minmax(280px, 24%) 1fr;
 				min-height: 0;
 			}
 
+			/* ------------------------------------------------- a coluna dos núcleos */
+
 			.nucleos {
 				border-right: 2px solid #2b2b2b;
-				padding: 24px 0;
 				overflow: hidden;
-			}
-
-			.nucleos div {
-				padding: 10px 32px;
-				font-size: 26px;
-				color: #d6d6d6;
-			}
-
-			.nucleos div span {
-				color: #5a5a5a;
-				font-size: 20px;
-				margin-left: 8px;
-			}
-
-			.nomes {
-				padding: 24px 32px;
-				overflow: hidden;
-			}
-
-			.grupo {
-				margin-bottom: 28px;
-			}
-
-			.grupo h2 {
-				font-size: 22px;
-				font-weight: 700;
-				color: var(--marca-amarelo);
-				text-transform: uppercase;
-				letter-spacing: 0.06em;
-				margin-bottom: 10px;
+				position: relative;
 			}
 
 			/*
-			 * Os nomes em colunas que se enchem sozinhas. Sem paginar e sem esconder: se um dia não
-			 * couberem, transbordam à vista num ecrã de teste em vez de desaparecerem em silêncio.
+			 * **O scroll automático é uma animação de CSS, e só existe quando é preciso.**
+			 *
+			 * Quando a lista passa da altura do ecrã, o rolo passa a conter os núcleos **duas vezes** e
+			 * desliza até -50%: a segunda cópia chega ao topo no instante em que a primeira sai, e a
+			 * volta não tem costura. A duração vem da altura, para a velocidade ser a mesma com dez
+			 * núcleos ou com trinta. Ninguém lhe toca.
+			 *
+			 * **A contagem actualiza-se no sítio, sem tocar na estrutura.** Reconstruir a lista a cada
+			 * entrada reiniciava esta animação e fazia a coluna saltar para o início de cinco em cinco
+			 * segundos. Só a chegada de um **núcleo novo** a reconstrói.
 			 */
-			.grupo ul {
-				list-style: none;
+			.rolo {
+				padding: 20px 0;
+			}
+
+			.rolo[data-rolar='sim'] {
+				animation: rolar var(--duracao, 60s) linear infinite;
+			}
+
+			@keyframes rolar {
+				from {
+					transform: translateY(0);
+				}
+				to {
+					transform: translateY(-50%);
+				}
+			}
+
+			.nucleo {
 				display: flex;
-				flex-wrap: wrap;
-				gap: 10px 20px;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: 16px;
+				padding: 12px 32px;
+				font-size: 30px;
+				color: #d6d6d6;
+				white-space: nowrap;
 			}
 
-			.grupo li {
-				font-size: 32px;
-				background: #1a1a1a;
-				border-left: 6px solid var(--marca-amarelo);
-				border-radius: 6px;
-				padding: 8px 16px;
+			.nucleo b {
+				color: var(--marca-amarelo);
+				font-size: 34px;
+				font-weight: 700;
 			}
 
-			.vazio {
+			/* ------------------------------------------------------------- a nuvem */
+
+			.nuvem {
+				position: relative;
+				overflow: hidden;
+			}
+
+			.espera {
 				display: grid;
 				place-items: center;
 				height: 100%;
-				font-size: 28px;
+				font-size: 30px;
 				color: #5a5a5a;
+			}
+
+			/*
+			 * Um nome da nuvem.
+			 *
+			 * **O corpo mínimo é a conta dos dez metros:** a altura de maiúscula legível é cerca de
+			 * 1/200 da distância — ~5 cm a 10 m —, o que num 1080p projectado a ~2,2 m de largura dá
+			 * perto de 44 px de corpo. É uma conta e não uma medição: vale a pena confirmar no
+			 * projector real antes do dia.
+			 *
+			 * A variação de tamanho é ±20%, por `--f`, e serve para a nuvem não parecer uma tabela.
+			 *
+			 * **Só branco e o amarelo da marca.** Sem cor por núcleo — uma cor por núcleo obrigava a
+			 * sala a decorar uma legenda para ler um nome — e sem imagens.
+			 */
+			.nome {
+				position: absolute;
+				transform: translate(-50%, -50%);
+				white-space: nowrap;
+				font-size: calc(clamp(44px, 6vmin, 92px) * var(--f, 1));
+				font-weight: 700;
+				opacity: 0;
+				/*
+				 * `fade in` 0,6 s → 6 s visível → `fade out` 0,8 s. Os `%` do keyframe saem daí, e a
+				 * duração total é a soma. O elemento sai do DOM no `animationend`, e é aí que a
+				 * célula da grelha fica livre outra vez.
+				 */
+				animation: passar 7.4s ease-in-out forwards;
+			}
+
+			.nome[data-cor='amarelo'] {
+				color: var(--marca-amarelo);
+			}
+
+			@keyframes passar {
+				0% {
+					opacity: 0;
+					transform: translate(-50%, -50%) scale(0.9);
+				}
+				8% {
+					opacity: 1;
+					transform: translate(-50%, -50%) scale(1);
+				}
+				89% {
+					opacity: 1;
+					transform: translate(-50%, -50%) scale(1);
+				}
+				100% {
+					opacity: 0;
+					transform: translate(-50%, -50%) scale(1.04);
+				}
+			}
+
+			/*
+			 * Quem tiver o sistema a pedir menos movimento continua a ver os nomes: o que se tira é o
+			 * deslizar e a escala, não a informação. O rolo dos núcleos passa a estático — com muitos
+			 * núcleos isso corta o que fica em baixo, e é a troca certa: quem pediu menos movimento
+			 * pediu-o por alguma razão.
+			 */
+			@media (prefers-reduced-motion: reduce) {
+				.rolo[data-rolar='sim'] {
+					animation: none;
+				}
+
+				.nome {
+					animation: aparecer 7.4s steps(1, end) forwards;
+				}
+
+				@keyframes aparecer {
+					0% {
+						opacity: 1;
+					}
+					100% {
+						opacity: 0;
+					}
+				}
 			}
 		</style>
 	</head>
@@ -148,20 +234,16 @@
 		</header>
 
 		<div class="corpo">
-			<div class="nucleos" id="nucleos"></div>
-			<div class="nomes" id="nomes">
-				<p class="vazio" id="vazio">À espera…</p>
-			</div>
+			<div class="nucleos"><div class="rolo" id="rolo"></div></div>
+			<div class="nuvem" id="nuvem"><p class="espera" id="espera">À espera…</p></div>
 		</div>
 
 		<script>
 			/*
 			 * **O `/mural` simples nunca limpa.** Se limpasse ao abrir, um recarregamento a meio da
 			 * sessão — ou um segundo portátil no mesmo endereço — apagava o que já lá estava, com a
-			 * sala toda a ver. O reinício é deliberado: só com `?reiniciar` no endereço.
-			 *
-			 * Depois de reiniciar, o parâmetro é tirado do endereço com `replaceState`, para um F5
-			 * a seguir não voltar a limpar.
+			 * sala toda a ver. O reinício é deliberado: só com `?reiniciar` no endereço, e o
+			 * parâmetro é tirado a seguir para um F5 não voltar a limpar.
 			 */
 			const SONDA_MS = 5000;
 
@@ -172,13 +254,66 @@
 				history.replaceState(null, '', location.pathname);
 			}
 
-			/** Tudo por `textContent`: são nomes de pessoas, vindos do Odoo. Nunca `innerHTML`. */
-			function desenhar(mural) {
-				const nucleos = document.getElementById('nucleos');
-				const nomes = document.getElementById('nomes');
-				const vazio = document.getElementById('vazio');
-				const conta = document.getElementById('conta');
+			/* ------------------------------------------------- a coluna dos núcleos */
 
+			/** Velocidade do rolo, em píxeis por segundo. Lento o suficiente para se ler a passar. */
+			const VELOCIDADE_PX_S = 22;
+
+			const rolo = document.getElementById('rolo');
+			const conta = document.getElementById('conta');
+
+			/** Qual era a lista de núcleos da última vez. Só uma lista diferente reconstrói o DOM. */
+			let chaveDosNucleos = '';
+			/** Nome do núcleo → os `<b>` da contagem. Dois, quando o rolo está duplicado. */
+			let contadores = new Map();
+
+			function linhaDeNucleo(n) {
+				const linha = document.createElement('div');
+				linha.className = 'nucleo';
+
+				const nome = document.createElement('span');
+				nome.textContent = n.nucleo;
+
+				const quantos = document.createElement('b');
+				quantos.textContent = n.total;
+
+				linha.append(nome, quantos);
+				return { linha, quantos };
+			}
+
+			function reconstruirNucleos(nucleos) {
+				rolo.replaceChildren();
+				rolo.dataset.rolar = 'nao';
+				contadores = new Map();
+
+				const juntar = () => {
+					for (const n of nucleos) {
+						const { linha, quantos } = linhaDeNucleo(n);
+						rolo.append(linha);
+
+						const existentes = contadores.get(n.nucleo) ?? [];
+						existentes.push(quantos);
+						contadores.set(n.nucleo, existentes);
+					}
+				};
+
+				juntar();
+
+				/*
+				 * Só depois de a primeira cópia estar no DOM é que se sabe se transborda. Se
+				 * transbordar, junta-se a segunda cópia e liga-se a animação: o `-50%` do keyframe
+				 * assume exactamente duas cópias.
+				 */
+				const cabe = rolo.scrollHeight <= rolo.parentElement.clientHeight;
+				if (cabe) return;
+
+				const altura = rolo.scrollHeight;
+				juntar();
+				rolo.style.setProperty('--duracao', `${Math.round(altura / VELOCIDADE_PX_S)}s`);
+				rolo.dataset.rolar = 'sim';
+			}
+
+			function desenharNucleos(mural) {
 				conta.replaceChildren();
 				if (mural.total > 0) {
 					const b = document.createElement('b');
@@ -186,54 +321,143 @@
 					conta.append(b, document.createTextNode(mural.total === 1 ? ' pessoa' : ' pessoas'));
 				}
 
-				// Só os núcleos que já têm alguém: a lista cresce à medida que a sala entra.
-				nucleos.replaceChildren();
-				for (const n of mural.nucleos) {
-					const linha = document.createElement('div');
-					linha.textContent = n.nucleo;
-
-					const quantos = document.createElement('span');
-					quantos.textContent = n.nomes.length;
-					linha.append(quantos);
-					nucleos.append(linha);
-				}
-
-				nomes.replaceChildren();
-				if (mural.nucleos.length === 0) {
-					vazio.textContent = 'À espera…';
-					nomes.append(vazio);
+				const chave = mural.nucleos.map((n) => n.nucleo).join('|');
+				if (chave !== chaveDosNucleos) {
+					chaveDosNucleos = chave;
+					reconstruirNucleos(mural.nucleos);
 					return;
 				}
 
+				// A estrutura não mudou: só os números, no sítio, sem interromper o rolo.
 				for (const n of mural.nucleos) {
-					const grupo = document.createElement('div');
-					grupo.className = 'grupo';
-
-					const titulo = document.createElement('h2');
-					titulo.textContent = n.nucleo;
-					grupo.append(titulo);
-
-					const lista = document.createElement('ul');
-					for (const nome of n.nomes) {
-						const item = document.createElement('li');
-						item.textContent = nome;
-						lista.append(item);
-					}
-
-					grupo.append(lista);
-					nomes.append(grupo);
+					for (const alvo of contadores.get(n.nucleo) ?? []) alvo.textContent = n.total;
 				}
 			}
 
+			/* ------------------------------------------------------------- a nuvem */
+
+			const nuvem = document.getElementById('nuvem');
+			const espera = document.getElementById('espera');
+
+			/*
+			 * **Uma grelha invisível por trás da posição aleatória.**
+			 *
+			 * Aleatório puro amontoa três nomes num canto e deixa metade do ecrã vazio. Escolhe-se
+			 * uma célula livre e desvia-se um pouco dentro dela: a distribuição fica solta sem ficar
+			 * alinhada. Com todas ocupadas, escolhe-se a que está ocupada há mais tempo — a
+			 * sobreposição ocasional é bem-vinda, o amontoado não.
+			 */
+			const COLUNAS = 6;
+			const LINHAS = 4;
+			const DESVIO = 0.35; // do tamanho da célula, para cada lado
+			const celulas = Array.from({ length: COLUNAS * LINHAS }, () => 0);
+
+			function escolherCelula(agora) {
+				const livres = [];
+				for (let i = 0; i < celulas.length; i++) if (celulas[i] === 0) livres.push(i);
+
+				if (livres.length > 0) return livres[Math.floor(Math.random() * livres.length)];
+
+				// Nenhuma livre: a que está ocupada há mais tempo é a que está mais perto de sair.
+				let escolhida = 0;
+				for (let i = 1; i < celulas.length; i++) if (celulas[i] < celulas[escolhida]) escolhida = i;
+				celulas[escolhida] = agora;
+				return escolhida;
+			}
+
+			function mostrarNome(texto) {
+				espera.hidden = true;
+
+				const agora = performance.now();
+				const celula = escolherCelula(agora);
+				celulas[celula] = agora;
+
+				const coluna = celula % COLUNAS;
+				const linha = Math.floor(celula / COLUNAS);
+				const desvio = () => (Math.random() * 2 - 1) * DESVIO;
+
+				const el = document.createElement('span');
+				el.className = 'nome';
+				el.textContent = texto;
+				el.style.left = `${((coluna + 0.5 + desvio()) / COLUNAS) * 100}%`;
+				el.style.top = `${((linha + 0.5 + desvio()) / LINHAS) * 100}%`;
+				el.style.setProperty('--f', (0.8 + Math.random() * 0.4).toFixed(2));
+				if (Math.random() < 0.4) el.dataset.cor = 'amarelo';
+
+				// A célula só fica livre quando o nome sai a sério do ecrã.
+				el.addEventListener('animationend', () => {
+					el.remove();
+					celulas[celula] = 0;
+					if (nuvem.querySelectorAll('.nome').length === 0) espera.hidden = false;
+				});
+
+				nuvem.append(el);
+			}
+
+			/*
+			 * **A fila, com intervalo contínuo.**
+			 *
+			 * Dez nomes a surgir juntos é ilegível, portanto entram espaçados. Mas um intervalo fixo
+			 * de meio segundo sustenta dois nomes por segundo, e trezentas pessoas a entrarem em dois
+			 * minutos criam uma fila que só esvazia depois de a sala estar sentada.
+			 *
+			 * O intervalo encurta com o tamanho da fila, entre 500 ms e um chão de 200 ms, por uma
+			 * curva e não por um degrau: `min + (max - min) / (1 + n / suavidade)`. Com a fila vazia
+			 * são 500 ms; com quatro à espera, 350; com vinte, 250; e nunca abaixo de 200. **Não há
+			 * salto visível**, porque a curva é contínua e recalcula-se a cada nome.
+			 */
+			const INTERVALO_MAX = 500;
+			const INTERVALO_MIN = 200;
+			const SUAVIDADE = 4;
+
+			const fila = [];
+			let aDrenar = false;
+
+			function intervaloDaFila(n) {
+				return INTERVALO_MIN + (INTERVALO_MAX - INTERVALO_MIN) / (1 + n / SUAVIDADE);
+			}
+
+			function drenar() {
+				const nome = fila.shift();
+				if (nome === undefined) {
+					aDrenar = false;
+					return;
+				}
+
+				mostrarNome(nome);
+				setTimeout(drenar, intervaloDaFila(fila.length));
+			}
+
+			function enfileirar(nomes) {
+				for (const nome of nomes) fila.push(nome);
+				if (aDrenar || fila.length === 0) return;
+
+				aDrenar = true;
+				drenar();
+			}
+
+			/* ------------------------------------------------------------- a sonda */
+
+			/**
+			 * O cursor da janela. **A primeira sonda vai sem ele e não traz nomes** — a nuvem é o que
+			 * está a acontecer, e quem abrir o mural a meio vê as contagens certas sem ver passar quem
+			 * já entrou. Ver `mural.ts`.
+			 */
+			let desde = null;
+
 			async function sondar() {
 				try {
-					const pedido = await fetch('/api/mural');
+					const pedido = await fetch(desde ? `/api/mural?desde=${encodeURIComponent(desde)}` : '/api/mural');
 					const corpo = await pedido.json();
-					if (corpo.ok) desenhar(corpo.mural);
+					if (!corpo.ok) return;
+
+					desde = corpo.mural.agora;
+					desenharNucleos(corpo.mural);
+					enfileirar(corpo.mural.novos);
 				} catch {
-					// Uma falha de rede não apaga o que está no ecrã: fica o último estado bom até a
-					// sonda seguinte. Um mural que pisca a vazio de cinco em cinco segundos é pior do
-					// que um mural com cinco segundos de atraso.
+					// Uma falha de rede não apaga o que está no ecrã, e não mexe no cursor: a sonda
+					// seguinte volta a pedir a mesma janela. Um mural que pisca a vazio de cinco em
+					// cinco segundos é pior do que um mural com cinco segundos de atraso.
 				}
 			}
 

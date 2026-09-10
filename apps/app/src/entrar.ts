@@ -9,10 +9,14 @@
  *
  * 1. **Formato.** Nove dígitos depois de tirar o resto. Fora disso não se toca no Odoo — é o filtro
  *    que impede um `=ilike` de correr com o que alguém escreveu à toa.
- * 2. **Travão por IP.** Antes do interruptor, de propósito: se corresse depois, um `429` só apareceria
- *    com a entrada aberta e a resposta passava a dizer em que estado é que o interruptor está.
- * 3. **Interruptor.** Fechado responde **exactamente** como "não há ficha" — mesmo corpo, mesmo
- *    estado. Fechado é o valor por omissão: um segredo em falta fecha, nunca abre.
+ * 2. **Travão por IP.** Antes do interruptor, porque **também vale com a porta fechada**: uma rota
+ *    aberta ao mundo que responde sempre a mesma coisa continua a ser uma rota que alguém pode
+ *    martelar, e o travão é o que limita o ritmo nos dois estados.
+ * 3. **Interruptor.** Fechado responde como "não há ficha". **Já não é para esconder o estado** — o
+ *    `GET /api/estado` publica-o, porque a página de entrada tem de saber qual das duas versões
+ *    mostrar. É simplesmente a resposta certa: com a porta fechada não há ficha nenhuma a devolver,
+ *    e um segundo caminho de código para dizer o mesmo por outras palavras não serve ninguém.
+ *    Fechado é o valor por omissão — ver `interruptor.ts`.
  * 4. **Odoo**, em duas passagens.
  * 5. **D1**, uma linha por pessoa.
  *
@@ -36,6 +40,7 @@
 
 import { many2oneId } from '@refood/odoo';
 import { nomeCurto } from './nomes';
+import { entradaAberta } from './interruptor';
 import { LINGUA, ligarAoOdoo } from './odoo';
 
 /** Cinco chega: o máximo de fichas activas com o mesmo NIF normalizado, medido em staging, é três. */
@@ -43,9 +48,6 @@ const LIMITE_FICHAS = 5;
 
 /** O sufixo que um `barcode` de voluntário tem. Verificado em JS — ver o cabeçalho. */
 const SUFIXO_VOLUNTARIO = '_VL';
-
-/** O valor que abre a entrada. Qualquer outra coisa, e a ausência do segredo, fecha. */
-const ABERTA = 'aberta';
 
 type FichaOdoo = {
 	id: number;
@@ -118,12 +120,37 @@ export function excedeTentativas(origem: string, agora: number): boolean {
 /**
  * A resposta de "não encontrámos ficha".
  *
- * **É a mesma com a entrada fechada e com a entrada aberta e sem resultados**, e essa igualdade é
- * deliberada: o corpo não diz se o interruptor está ligado. Encaminha para o núcleo, que é o que
- * uma pessoa sem ficha utilizável — 418 activas, uma em catorze — tem de fazer.
+ * **É a mesma com a entrada fechada e com a entrada aberta e sem resultados.** Não para esconder
+ * o estado do interruptor — esse é público, no `/api/estado` — mas porque é a mesma verdade: não
+ * há ficha para devolver, e as duas situações não pedem duas frases.
+ *
+ * ## A frase é escolhida, palavra a palavra, e não é uma mensagem de erro
+ *
+ * Vai ser lida por dezenas de pessoas ao mesmo tempo, numa sala, com quem está ao lado a ver o ecrã
+ * do vizinho. **418 fichas activas não têm NIF utilizável — uma em catorze** — e nem toda a gente
+ * que está na sala está em sistema. Isto vai aparecer muitas vezes, e não pode soar a recusa.
+ *
+ * - **"Ainda"** tira o definitivo: não é um "não", é um "por enquanto".
+ * - **"Há fichas por completar"** põe a falha no sistema, onde ela está, e não na pessoa.
+ * - **"pode ser uma delas"** não afirma uma causa que esta rota não sabe. A ficha pode não ter NIF,
+ *   ter um diferente do que a pessoa escreveu, ou a pessoa pode nunca ter sido registada — e daqui
+ *   não se distingue nenhuma das três. Uma frase que dissesse *"falta o NIF na tua ficha"* seria
+ *   mais tranquilizadora e podia estar errada em voz alta.
+ * - **"eles tratam disso"** fecha com o passo seguinte, e com ele do lado de quem o pode dar.
+ *
+ * O ecrã mostra-a **a branco**, e não no vermelho do erro de formato: vermelho lê-se como recusa, e
+ * a única coisa aqui que é mesmo uma correcção é o "o NIF são nove dígitos".
  */
 function semFicha(): Response {
-	return Response.json({ ok: false, erro: 'sem_ficha', mensagem: 'Não encontrámos a tua ficha. Fala com o teu núcleo.' }, { status: 404 });
+	return Response.json(
+		{
+			ok: false,
+			erro: 'sem_ficha',
+			titulo: 'Ainda não te encontrámos.',
+			mensagem: 'Há fichas por completar, e a tua pode ser uma delas. Diz ao teu núcleo e eles tratam disso.',
+		},
+		{ status: 404 },
+	);
 }
 
 export async function rotaEntrar(request: Request, env: Env): Promise<Response> {
@@ -135,13 +162,13 @@ export async function rotaEntrar(request: Request, env: Env): Promise<Response> 
 		return Response.json({ ok: false, erro: 'formato', mensagem: 'O NIF são nove dígitos.' }, { status: 400 });
 	}
 
-	// **Antes do interruptor**: um 429 que só aparecesse com a entrada aberta denunciava o estado dela.
+	// Antes do interruptor: o travão vale nos dois estados. Ver o cabeçalho.
 	const origem = request.headers.get('CF-Connecting-IP') ?? 'desconhecida';
 	if (excedeTentativas(origem, Date.now())) {
 		return Response.json({ ok: false, erro: 'demasiadas_tentativas' }, { status: 429, headers: { 'Retry-After': '60' } });
 	}
 
-	if (env.ENTRADA_ABERTA !== ABERTA) return semFicha();
+	if (!entradaAberta(env)) return semFicha();
 
 	const { cliente, empresas, nucleos } = await ligarAoOdoo(env);
 	if (empresas.length === 0) return semFicha();

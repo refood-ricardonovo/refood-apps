@@ -29,13 +29,27 @@ Because while it is open, the page **confirms to anyone who types a NIF that the
 
 What holds it up:
 
-- **Closed is the default.** A missing secret closes; only the exact value `aberta` opens. A configuration that fails to load must never be the thing that opens the door — the same rule as the TV's `ADMIN_SECRET`.
-- **Closed answers exactly like "no such ficha"** — same body, same status. If it answered differently, the response would tell anyone who asked whether the demo is running, and it exists precisely to confirm nothing.
+- **Closed is the default.** A missing secret closes; only the exact value `aberta` opens. A configuration that fails to load must never be the thing that opens the door — the same rule as the TV's `ADMIN_SECRET`. It is also what lets the app be deployed to production with no secrets at all and still serve the right page.
 - **`/api/mural` obeys the same switch**, and returns empty when closed. Without that it would go on serving the list of who was there long after the room emptied, from a public URL.
 - **It lives in `wrangler secret`, never in `vars`** — `vars` are public build-time constants baked into the generated types.
-- **Ten attempts per minute per IP**, in the isolate's memory, nothing written. That is not protection: it stops a distracted script and a finger stuck on Enter. What actually bounds this route is the switch, and the throttle runs **before** the switch check so that a `429` never reveals which state the switch is in.
+- **Ten attempts per minute per IP**, in the isolate's memory, nothing written. That is not protection: it stops a distracted script and a finger stuck on Enter. It runs **before** the switch check, because a route that is open to the world and always answers the same thing is still a route somebody can hammer — the throttle limits the rate in both states.
+- **`/api/entrar` answers the same when closed as when open with no match.** Not to hide anything (see below) — because it is the same truth: with the door shut there is no ficha to return, and two code paths to say that in two ways serve nobody.
+
+### The switch state is public, and that is a decision
+
+**`GET /api/estado` tells anyone who asks whether the door is open**, because the entry page has to know which of its two versions to show, and the page is served as a static asset — the state has to come from somewhere. There is no way around it: a page that changes with the switch publishes the switch, whether through an API or by serving different HTML.
+
+This replaces an earlier rule that said the closed response had to be byte-identical _so that nobody could tell whether the demo was running_. That rule is gone rather than quietly contradicted, and what replaces it is narrower and true:
+
+**What is published is one bit — "the door is open".** It says nothing about any person: not who entered, not how many, not which núcleos are in the room. What still requires one question per NIF, and is still bounded by the throttle and by how long the switch stays on, is the only thing worth hiding: whether a given number belongs to a volunteer, and where.
 
 **Turning the switch off is the only cleanup that matters, and it is not automatic. Do it, and empty `presencas_demo`.**
+
+### The entry page is born closed
+
+`public/index.html` ships the closed version — the logo and _"A app dos voluntários está a chegar."_ The NIF form is `hidden` and only appears if `/api/estado` says the door is open.
+
+That direction is deliberate, and it buys three things: **the normal state does not flash** (closed is what it is on every day but one), **without JavaScript you see the correct page** instead of a form that could not work, and **if the API is down you see the same** rather than a broken form. The app is in production permanently; the demo is one afternoon.
 
 ## A NIF does not identify one ficha
 
@@ -55,6 +69,52 @@ Measured against staging in September 2026, over the 5 772 active `hr.employee` 
 **When the real login lands, the tie-break between fichas is the code sent to each one's `hr_email`:** whoever answers the code fixes both the ficha and the núcleo. **Never show the person the list of fichas or of núcleos that match a NIF** — that is the same oracle the switch exists to bound, handed over one query at a time. `/api/entrar` keeps the first row and does not say there were others: the body has three keys and none of them is a count.
 
 **418 active fichas have no usable NIF and cannot come in this way** — no `vat` at all, or a value that is not nine digits once cleaned. That is roughly one active volunteer in fourteen, and they need recovery through their núcleo. A login that has no answer for them is a login that excludes them.
+
+### What "not found" says, and why it is white
+
+That one in fourteen, plus everyone in the room who is not in the system at all, means this message is read **many times, at once, in a room, with the person next to you looking at your screen.** It is not an error message and it must not read as one:
+
+> **Ainda não te encontrámos.**
+> Há fichas por completar, e a tua pode ser uma delas. Diz ao teu núcleo e eles tratam disso.
+
+Every part of it is load-bearing. **"Ainda"** removes the finality. **"Há fichas por completar"** puts the fault in the system, where it is, and not in the person. **"pode ser uma delas"** does not assert a cause this route cannot know — the ficha may have no NIF, a different one from what was typed, or the person may never have been registered, and from here the three are indistinguishable; a friendlier _"falta o NIF na tua ficha"_ would be more reassuring and could be wrong out loud. **"eles tratam disso"** ends on the next step, with it on the side of whoever can take it.
+
+**It renders white, not in the red of the format error.** Red reads as refusal. The only thing on this screen that is genuinely a correction — and keeps the red — is _"o NIF são nove dígitos"_.
+
+## The mural has two halves, and they are different kinds of thing
+
+The room is around 300 people and the screen is read from ten metres. That forced the shape:
+
+- **The left column is state.** Which núcleos are present and how many of each, ordered by **when the first volunteer of each núcleo arrived** — the order the room filled, not the alphabet. It stays.
+- **The cloud is event.** Each first name appears **once**, when that person walks in: fade in, six seconds, fade out, gone. Nothing is recycled to fill the screen — a name on that wall means someone just arrived, and a name that came back would be a lie about the room.
+
+**`GET /api/mural?desde=<iso>` reads a window, not a list.** The window is `(desde, agora]`, with `agora` fixed at the first instant of the request and returned as the next cursor, so two consecutive polls abut with no gap and no overlap.
+
+### The first poll brings no names, and that is not a bug
+
+**Write this down before someone "fixes" it in a year.** A poll without `desde` returns the counts and a cursor, and an empty list of names.
+
+The reason is the split above: **the cloud is what is happening, the column is the state.** Someone who opens the mural halfway through the session gets everybody's counts, correct, and does not get a burst of two hundred names that arrived while nobody was projecting. **Whoever was not watching, did not see it.** The same applies to a mid-session reload: the board keeps its counts and the cloud picks up from that moment.
+
+### The counts come from the `GROUP BY`, never from Odoo
+
+`COUNT(*)` per `company_id` counts **everyone who came in, without exception** — including anyone whose ficha returns no readable name. That person counts in the column and simply does not appear in the cloud. The previous version derived the counts from the Odoo read and dropped them from both, silently.
+
+It also makes the mural cheap. The old version read every present volunteer on every poll: at 300 people and five seconds, 3 600 fichas a minute against an on-premise database, to redraw a screen that barely changes. Now a poll where nobody arrived is **one SQL query and zero calls to Odoo**.
+
+### What a millisecond cursor loses, and why that is the cheaper side
+
+The window is open on the left (`criado_em > desde`). Two entries in the **same millisecond** on a poll boundary would drop one.
+
+**The consequence is not a wrong count.** A name is lost from the cloud; the núcleo's count stays right, because it comes from the `GROUP BY` and not from this window. Someone walks in, the left column goes up, and their name does not cross the screen.
+
+**That is precisely why an `employee_id` does not go in the payload.** Breaking the tie would mean publishing a stable identifier for a real person on a public, unauthenticated page — permanently — to avoid, in a case that needs two people pressing the button in the same millisecond, one name not showing for six seconds. The identifier is forever; the missed name lasts six seconds.
+
+### The queue tightens on a curve, not on a step
+
+Ten names appearing at once is unreadable, so arrivals queue and enter spaced out. But a fixed half-second sustains two names a second, and 300 people arriving over two minutes build a queue that only drains after the room has sat down.
+
+The interval shortens with the queue — `min + (max - min) / (1 + n / 4)`, between **500 ms and a floor of 200 ms**. Empty queue, 500 ms; four waiting, 350; twenty, 250; never below 200. It is a curve and it is recomputed before each name, so **there is no visible jump** the way a threshold would give one.
 
 ## The manifest declares `id` explicitly
 
@@ -92,6 +152,9 @@ The screen shows `refood_logo_horizontal_fundo_escuro.svg`, not the word "Refood
 - `worker-configuration.d.ts` is **generated — never hand-edit it.** After changing any binding or var in `wrangler.jsonc`, run `npm run cf-typegen --workspace=app`. It only knows the secrets it finds in `.dev.vars`, so a new secret has to be there before the types will mention it.
 - There is no `.prettierrc` or `.editorconfig` here: the ones at the root apply, and a third identical copy is a file that drifts.
 - `test/d1-falso.ts` is the **second** copy of the TV's — the tests run against the real migrations over `node:sqlite`. **At the third, extract `packages/d1-falso`**, the same trigger written above for the font.
+- **There is no bare `deploy` script, deliberately.** With production living in a named environment, `wrangler deploy` with no `--env` would push the top-level config — which has no routes — onto the production worker. `npm run deploy:staging` and `npm run deploy:producao` each carry their own `--env`. It is the same class of mistake the root `CLAUDE.md` documents for `d1 migrations apply`, and it deserved the same treatment.
+
+**This app reads the production Odoo with an account that should not be the one it is using.** It should be a dedicated integration user, `apps@re-food.org`, which **does not exist yet**; what is in use is a personal account. That was a debt with no consequence while everything was staging — it stopped being one the day this went to `myrefood.pt` against real volunteers. The account has to be created with the full `company_ids`, or núcleos appear that no app can read. Tracked in [`docs/arquitetura.md`](../../docs/arquitetura.md).
 
 `/api/health` answers `ok` and the time, and nothing else — no version, no addresses, nothing describing what is behind it. A test pins the shape of that body: the TV had a diagnostic route that grew until it was reading `res.users` with no scope, and this is the cheap way not to repeat it.
 

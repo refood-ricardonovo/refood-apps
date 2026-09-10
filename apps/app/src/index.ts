@@ -22,16 +22,30 @@
  */
 
 import { rotaEntrar } from './entrar';
+import { rotaEstado } from './interruptor';
 import { rotaMural, rotaReiniciarMural } from './mural';
 
 function metodoErrado(permitido: string): Response {
 	return Response.json({ ok: false, erro: 'metodo_nao_permitido' }, { status: 405, headers: { Allow: permitido } });
 }
 
-/** O encaminhamento é à mão, sobre o `pathname`, como na TV. Sem router: são quatro casos. */
+/** O encaminhamento é à mão, sobre o `pathname`, como na TV. Sem router: são cinco casos. */
 export default {
 	async fetch(request, env): Promise<Response> {
 		const url = new URL(request.url);
+
+		/*
+		 * Qual das duas páginas de entrada é que a pessoa vê. **O estado vem daqui e não do
+		 * frontend**, porque o frontend não pode sabê-lo — e porque o estado normal, em todos os dias
+		 * menos um, é fechado.
+		 *
+		 * Publica um bit: *a porta está aberta*. Não diz nada sobre pessoa nenhuma. Ver
+		 * `interruptor.ts`.
+		 */
+		if (url.pathname === '/api/estado') {
+			if (request.method !== 'GET') return metodoErrado('GET');
+			return rotaEstado(env);
+		}
 
 		if (url.pathname === '/api/entrar') {
 			if (request.method !== 'POST') return metodoErrado('POST');
@@ -40,7 +54,7 @@ export default {
 
 		if (url.pathname === '/api/mural') {
 			if (request.method !== 'GET') return metodoErrado('GET');
-			return await rotaMural(env);
+			return await rotaMural(request, env);
 		}
 
 		// POST e não GET: apaga uma tabela. Uma sonda, um pré-carregamento ou um `<img>` apontado a
