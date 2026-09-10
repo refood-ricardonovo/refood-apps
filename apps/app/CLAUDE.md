@@ -64,7 +64,9 @@ Measured against staging in September 2026, over the 5 772 active `hr.employee` 
 1. equality on `vat` with the nine digits;
 2. **only if that comes back empty**, `=ilike` with the digits separated by `%` — `1%2%3…%9`, no `%` at the ends, so the value must start and end on the right digit.
 
-**The second pass brings false positives that the domain cannot filter**, because `%` matches anything: the equality is confirmed in the Worker, by normalising the `vat` that came back. And `barcode` ending in `_VL` is checked in the Worker too, never in a domain — **`_` is a single-character wildcard in SQL's `LIKE`**, so `['barcode', 'like', '%_VL']` would match `XVL` and anything else ending in three characters that finish in `VL`.
+**The second pass brings false positives that the domain cannot filter**, because `%` matches anything: the equality is confirmed in the Worker, by normalising the `vat` that came back.
+
+**There is no `barcode` filter, and its removal was a product decision.** The route used to require `_VL` at the end of the `barcode` and discard everything else. It no longer does: **finding an active ficha with that NIF is the answer, and the núcleo is that ficha's `company_id`.** Active fichas exist with no `barcode` at all, and those people could not get in; a ficha with another suffix is not, for this demo, a ficha of something else. If the filter ever comes back, it is checked **in the Worker and never in a domain** — **`_` is a single-character wildcard in SQL's `LIKE`**, so `['barcode', 'like', '%_VL']` would match `XVL` and anything else ending in three characters that finish in `VL`.
 
 **When the real login lands, the tie-break between fichas is the code sent to each one's `hr_email`:** whoever answers the code fixes both the ficha and the núcleo. **Never show the person the list of fichas or of núcleos that match a NIF** — that is the same oracle the switch exists to bound, handed over one query at a time. `/api/entrar` keeps the first row and does not say there were others: the body has three keys and none of them is a count.
 
@@ -158,7 +160,13 @@ The screen shows `refood_logo_horizontal_fundo_escuro.svg`, not the word "Refood
 
 `/api/health` answers `ok` and the time, and nothing else — no version, no addresses, nothing describing what is behind it. A test pins the shape of that body: the TV had a diagnostic route that grew until it was reading `res.users` with no scope, and this is the cheap way not to repeat it.
 
-**This app reads across every núcleo, and it is the second route in the project to do so.** The scope rule says `company_id` comes from the authenticated subject and never from the request — _wherever such a subject exists_. Here none does: the NIF is the input, not a credential, and the question the route asks is exactly _which núcleo is this ficha in?_ So `allowed_company_ids` is the integration user's whole `company_ids`, read from `res.users` and **never from `res.company`** — staging has 87 companies and the user has 84, and asking for one of the other three throws `AccessError` and takes the whole request with it. It fails closed: no user, no list; empty `company_ids`, empty list. See `src/odoo.ts`.
+**This app reads across every núcleo, and it is the second route in the project to do so.** The scope rule says `company_id` comes from the authenticated subject and never from the request — _wherever such a subject exists_. Here none does: the NIF is the input, not a credential, and the question the route asks is exactly _which núcleo is this ficha in?_
+
+**So neither route builds `allowed_company_ids` at all — and this is the one app where that is right.** There used to be a list here, read from the integration user's `company_ids`, passed in the context of every read. It protected nothing in this app and it hid fichas: a route whose whole purpose is to discover a núcleo cannot restrict itself to a list before it knows which one it wants. What replaced it is nothing — the ficha's own `company_id` is the answer, and its name arrives inside the many2one.
+
+**The ceiling did not go away, because it was never ours.** Odoo's multi-company `ir.rule`s evaluate against the authenticated account's `company_ids`, and a context could only ever **narrow** inside that — never widen it. The consequence is worth having written down: a ficha in a núcleo the account does not hold answers exactly like a ficha that does not exist. If the demo cannot find anyone from a whole núcleo, what is missing is that núcleo on the account — the `apps@re-food.org` debt — and not a line of code. See `src/odoo.ts`.
+
+**None of this transfers to `apps/tv`**, where there is a token, there is one núcleo, and the root rule applies whole: `company_id` in the domain **and** `allowed_company_ids` in the context.
 
 **`POST /api/mural/reiniciar` is a POST because it deletes a table.** A GET that destroys is a GET that a probe, a prefetch or an `<img>` fires on its own. The `/mural` page calls it only when the address carries `?reiniciar`, and then strips the parameter — the plain `/mural` never clears, so a reload mid-session does not wipe the board with the room watching.
 

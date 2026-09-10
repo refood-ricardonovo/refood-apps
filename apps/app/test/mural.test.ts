@@ -164,7 +164,9 @@ describe('GET /api/mural', () => {
 		const leitura = chamadas.find((c) => c.modelo === 'hr.employee');
 		expect(leitura?.metodo).toBe('read');
 		expect(leitura?.args[0]).toEqual([43, 44]);
-		expect((leitura?.kwargs.context as Record<string, unknown>).allowed_company_ids).toEqual([75, 76]);
+		// **Sem âmbito no contexto**, como na rota de entrada: o tecto é o da conta e é o Odoo que o
+		// impõe; um contexto só o podia estreitar, aqui até esconder o nome de quem está na sala.
+		expect((leitura?.kwargs.context as Record<string, unknown>)?.allowed_company_ids).toBeUndefined();
 	});
 
 	/** Só o primeiro nome: é um projector numa sala com gente que não é dali. */

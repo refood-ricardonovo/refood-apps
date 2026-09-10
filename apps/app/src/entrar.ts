@@ -31,30 +31,37 @@
  * tenha outros dígitos pelo meio. **O domínio não filtra isso, e por isso a igualdade confirma-se em
  * JS**, normalizando o `vat` que veio e comparando com os nove dígitos escritos.
  *
- * ## O `_VL` do barcode verifica-se em JS, e não no domínio
+ * ## Não há filtro por `barcode`, e a razão é de produto
  *
- * `_` é um wildcard de um caractere no `LIKE` do SQL: um domínio `['barcode', 'like', '%_VL']`
- * casaria com `XVL`, `1VL` e tudo o que acabe em três caracteres terminados em `VL`. A verificação
- * fica do lado do Worker, onde `_` é só um underscore.
+ * A rota exigia `_VL` no fim do `barcode` e descartava tudo o resto. **Deixou de exigir:
+ * encontrar uma ficha activa com aquele NIF é a resposta, e o núcleo é o `company_id` dela.** Um
+ * voluntário sem código de barras existe na base e não conseguia entrar; e uma ficha com outro
+ * sufixo não é, para efeitos desta demonstração, uma ficha de outra coisa.
+ *
+ * Se o filtro voltar, **verifica-se em JS e nunca num domínio**: `_` é um wildcard de um
+ * caractere no `LIKE` do SQL, e `['barcode', 'like', '%_VL']` casaria com `XVL`, `1VL` e tudo o
+ * que acabe em três caracteres terminados em `VL`.
+ *
+ * ## Não vai âmbito nenhum no contexto, e não é esquecimento
+ *
+ * Não se constrói `allowed_company_ids`. Esta rota existe para descobrir o núcleo, portanto não
+ * pode restringir-se a uma lista antes de o conhecer — e o tecto do que a conta lê continua a
+ * ser imposto pelo Odoo, que um contexto só podia estreitar. Ver `odoo.ts`.
  */
 
-import { many2oneId } from '@refood/odoo';
+import { createOdooClient, many2one } from '@refood/odoo';
 import { nomeCurto } from './nomes';
 import { entradaAberta } from './interruptor';
-import { LINGUA, ligarAoOdoo } from './odoo';
+import { LINGUA } from './odoo';
 
 /** Cinco chega: o máximo de fichas activas com o mesmo NIF normalizado, medido em staging, é três. */
 const LIMITE_FICHAS = 5;
-
-/** O sufixo que um `barcode` de voluntário tem. Verificado em JS — ver o cabeçalho. */
-const SUFIXO_VOLUNTARIO = '_VL';
 
 type FichaOdoo = {
 	id: number;
 	name: string | false;
 	full_name: string | false;
 	company_id: [number, string] | false;
-	barcode: string | false;
 	vat?: string | false;
 };
 
@@ -75,11 +82,6 @@ export function digitosDoNif(valor: unknown): string | null {
  */
 export function padraoFrouxo(digitos: string): string {
 	return digitos.split('').join('%');
-}
-
-/** Um `barcode` de voluntário acaba em `_VL`. Sem barcode, não é candidato. */
-export function ehVoluntario(barcode: unknown): boolean {
-	return typeof barcode === 'string' && barcode.trimEnd().endsWith(SUFIXO_VOLUNTARIO);
 }
 
 /* ------------------------------------------------------------ travão por IP */
@@ -170,15 +172,13 @@ export async function rotaEntrar(request: Request, env: Env): Promise<Response> 
 
 	if (!entradaAberta(env)) return semFicha();
 
-	const { cliente, empresas, nucleos } = await ligarAoOdoo(env);
-	if (empresas.length === 0) return semFicha();
+	const cliente = createOdooClient(env);
 
 	const opcoes = {
-		fields: ['id', 'name', 'full_name', 'company_id', 'barcode'],
+		fields: ['id', 'name', 'full_name', 'company_id'],
 		limit: LIMITE_FICHAS,
 		order: 'id asc',
 		lang: LINGUA,
-		context: { allowed_company_ids: [...empresas] },
 	};
 
 	// Passagem 1: igualdade sobre o `vat`, que está armazenado.
@@ -205,12 +205,19 @@ export async function rotaEntrar(request: Request, env: Env): Promise<Response> 
 		fichas = largas.filter((f) => digitosDoNif(f.vat) === digitos);
 	}
 
-	const candidatas = fichas.filter((f) => ehVoluntario(f.barcode));
-	const ficha = candidatas[0];
+	// A primeira que aparecer, por `id` ascendente. Não há mais nenhum filtro depois da pesquisa.
+	const ficha = fichas[0];
 	if (!ficha) return semFicha();
 
-	const empresa = many2oneId(ficha.company_id);
-	if (empresa === null) return semFicha();
+	/*
+	 * **O núcleo é o `company_id` da ficha**, e o nome dele vem dentro do próprio many2one, já em
+	 * pt-PT por causa do `lang` — não é preciso uma segunda leitura a `res.company`.
+	 *
+	 * Sem empresa não há núcleo a dizer. O `company_id` é obrigatório no `hr.employee`, portanto
+	 * isto é uma guarda e não um caso esperado.
+	 */
+	const nucleo = many2one(ficha.company_id);
+	if (nucleo === null) return semFicha();
 
 	/*
 	 * **Fica com a primeira, e não diz que havia mais.**
@@ -221,12 +228,12 @@ export async function rotaEntrar(request: Request, env: Env): Promise<Response> 
 	 * código para o `hr_email`, e não existe ainda.
 	 */
 	await env.DB.prepare('INSERT INTO presencas_demo (employee_id, company_id, criado_em) VALUES (?, ?, ?) ON CONFLICT DO NOTHING')
-		.bind(ficha.id, empresa, new Date().toISOString())
+		.bind(ficha.id, nucleo.id, new Date().toISOString())
 		.run();
 
 	return Response.json({
 		ok: true,
 		nome: nomeCurto(ficha.full_name, ficha.name),
-		nucleo: nucleos.get(empresa) ?? null,
+		nucleo: nucleo.nome,
 	});
 }

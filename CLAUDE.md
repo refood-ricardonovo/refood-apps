@@ -120,7 +120,11 @@ estão nos ficheiros de conhecimento (`arquitetura.md`, `modelos-odoo.md` e os d
   admin, só actua sobre um pendente dentro do prazo, e recusa um `company_id` que não esteja na lista
   das empresas que o utilizador de integração consegue ler. Fora daí, nada copia esta forma.
 - Toda a consulta leva `["company_id", "=", empresa]` no domínio **e** `allowed_company_ids: [empresa]`
-  no contexto — inclusive nos modelos que respondem bem sem ele.
+  no contexto — inclusive nos modelos que respondem bem sem ele. **Isto pressupõe que há uma empresa**,
+  e a excepção é a mesma de sempre: onde não há sujeito nem núcleo, não há o que restringir. As duas
+  rotas de `apps/app` que descobrem o núcleo a partir de uma ficha não constroem `allowed_company_ids`
+  nenhum — e o tecto continua a ser o `company_ids` da conta, que o Odoo impõe e um contexto só podia
+  estreitar. Está escrito no `CLAUDE.md` dessa app; fora dali, nada copia esta forma.
 - **Toda a chave de cache leva o núcleo e a língua, e leva-os em claro.** A língua não é higiene:
   uma resposta guardada numa língua continuaria a ser servida depois de a língua mudar, e na PWA
   duas pessoas de línguas diferentes partilhariam a mesma entrada.

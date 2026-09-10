@@ -39,16 +39,16 @@
  * milissegundo, que um nome não apareça durante seis segundos.
  */
 
-import { many2oneId } from '@refood/odoo';
+import { createOdooClient } from '@refood/odoo';
 import { entradaAberta } from './interruptor';
 import { primeiroNome } from './nomes';
-import { LINGUA, ligarAoOdoo } from './odoo';
+import { LINGUA, nomesDosNucleos } from './odoo';
 
 /** Tectos das leituras. Há 87 núcleos na base, e uma sala não tem mais gente do que isto. */
 const LIMITE_NUCLEOS = 200;
 const LIMITE_NOVOS = 100;
 
-type FichaOdoo = { id: number; full_name: string | false; name?: string | false; company_id: [number, string] | false };
+type FichaOdoo = { id: number; full_name: string | false; name?: string | false };
 type GrupoSql = { company_id: number; total: number; primeiro: string };
 type ChegadaSql = { employee_id: number; criado_em: string };
 
@@ -104,12 +104,22 @@ export async function rotaMural(request: Request, env: Env): Promise<Response> {
 		return Response.json({ ok: true, mural: { nucleos: [], total: 0, novos: [], agora } });
 	}
 
-	const { cliente, empresas, nucleos } = await ligarAoOdoo(env);
+	const cliente = createOdooClient(env);
+
+	/*
+	 * **Os ids dos núcleos vêm do D1, não de uma pesquisa a `res.company`** — foram gravados a
+	 * partir do `company_id` da ficha de quem entrou. O `res.company` só lhes põe o nome.
+	 */
+	const nucleos = await nomesDosNucleos(
+		cliente,
+		grupos.results.map((g) => g.company_id),
+	);
 
 	/*
 	 * `read` e não `search_read`: os ids são nossos, saíram da pesquisa que os gravou, e o que falta
-	 * é o nome de cada um. O `allowed_company_ids` vai na mesma — é o que a regra espera, e o que
-	 * protege de uma mudança do lado do Odoo.
+	 * é o nome de cada um. **Sem `allowed_company_ids`**, pela mesma razão que a rota de entrada não
+	 * o leva: o tecto é o da conta, imposto pelo Odoo, e um contexto só podia estreitá-lo — aqui,
+	 * até ao ponto de esconder o nome de quem já está na sala. Ver `odoo.ts`.
 	 */
 	const fichas =
 		chegadas.results.length === 0
@@ -117,8 +127,8 @@ export async function rotaMural(request: Request, env: Env): Promise<Response> {
 			: await cliente.read<FichaOdoo>(
 					'hr.employee',
 					chegadas.results.map((c) => c.employee_id),
-					['full_name', 'name', 'company_id'],
-					{ lang: LINGUA, context: { allowed_company_ids: [...empresas] } },
+					['full_name', 'name'],
+					{ lang: LINGUA },
 				);
 
 	// O `read` não garante ordem: reordena-se pela chegada, que é a ordem em que a nuvem os mostra.

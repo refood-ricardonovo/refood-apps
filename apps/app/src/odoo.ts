@@ -1,5 +1,5 @@
 /**
- * A ligação ao Odoo desta app, e o âmbito com que ela lê.
+ * A ligação ao Odoo desta app, e por que razão ela não leva âmbito.
  *
  * ## Esta app lê fora de um núcleo, e é a segunda do projecto a fazê-lo
  *
@@ -12,25 +12,31 @@
  * sem sujeito — e, como ela, só se aguenta por estar cercada. As cercas desta estão em `entrar.ts`
  * e no `CLAUDE.md` desta app: o interruptor que a abre e fecha, e o facto de sair com o atalho.
  *
- * ## A lista de empresas vem do utilizador, nunca de `res.company`
+ * ## Não se constrói `allowed_company_ids`, e o tecto não desapareceu por isso
  *
- * `allowed_company_ids` sai do `company_ids` do próprio utilizador de integração, lido de
- * `res.users`. Em staging a base tem 87 empresas e o utilizador tem 84: pedir uma das três de fora
- * devolve `AccessError` e rebenta o pedido inteiro, mesmo com as outras 84 certas. Uma lista que
- * saísse de `res.company` oferecia o que a app não consegue ler. Ver o `CLAUDE.md` da raiz.
+ * Havia aqui uma lista de empresas permitidas, lida do `company_ids` do utilizador de integração, e
+ * ia no contexto de cada leitura. **Saiu**, porque nesta app ela não protegia nada e escondia
+ * fichas: o núcleo do voluntário é o `company_id` da ficha dele, e uma rota que existe para o
+ * descobrir não pode restringir-se a uma lista antes de o conhecer.
  *
- * **Falha fechada**: sem utilizador, sem lista; com `company_ids` vazio, lista vazia. A tentação é
- * o contrário — "então mostra tudo" —, e é o bug.
+ * **O tecto continua a existir, e é do Odoo, não nosso.** As `ir.rule` de multi-empresa avaliam
+ * contra o `company_ids` da conta autenticada, e um `allowed_company_ids` no contexto só podia
+ * **estreitar** dentro dele — nunca alargar. Consequência prática, e vale a pena tê-la escrita: uma
+ * ficha num núcleo que a conta não tem responde exactamente como uma ficha que não existe. Se a
+ * demonstração não encontrar gente de um núcleo inteiro, o que falta é esse núcleo na conta — e é a
+ * dívida do `apps@re-food.org`, não uma linha de código.
+ *
+ * **Nada disto vale para a app da TV**, onde há token, há um núcleo, e a regra da raiz aplica-se
+ * inteira: domínio com `company_id` **e** `allowed_company_ids` no contexto.
  */
 
-import { createOdooClient, type OdooClient } from '@refood/odoo';
+import { type OdooClient } from '@refood/odoo';
 
 /** A língua com que esta app lê o Odoo. Sem `lang` o Odoo lê `en_US` e nada na resposta o diz. */
 export const LINGUA = 'pt_PT';
 
-/** Quanto tempo se guarda a lista de núcleos. É catálogo: muda quando alguém cria uma empresa. */
+/** Quanto tempo se guardam os nomes dos núcleos. É catálogo: muda quando alguém cria uma empresa. */
 const CACHE_NUCLEOS_S = 600;
-const CHAVE_NUCLEOS = 'https://refood-app.interno/cache/nucleos';
 
 const LIMITE_EMPRESAS = 200;
 
@@ -40,44 +46,29 @@ const LIMITE_EMPRESAS = 200;
  * do `apps/tv`.
  */
 type NucleoOdoo = { id: number; name: string };
-type UtilizadorOdoo = { id: number; company_ids: number[] };
 
 /**
- * As empresas que o utilizador de integração consegue mesmo ler.
+ * Os nomes dos núcleos, para ids que **já são nossos**.
  *
- * Não leva cache própria: é uma leitura pequena e o que se guarda é o resultado do
- * {@link lerNucleos}, que a inclui.
+ * Quem chama passa os `company_id` que saíram das fichas gravadas no D1: a lista não nasce de uma
+ * leitura de `res.company`, só ganha nomes aqui. É a distinção que a regra da raiz faz — o que ela
+ * proíbe é **oferecer** um núcleo saído de `res.company`, não pôr um nome num id que já se tem.
+ *
+ * Cache partilhada por todos os pedidos deste POP, com os ids na chave: o mural pede isto de cinco
+ * em cinco segundos e a resposta só muda quando aparece um núcleo novo na sala.
  */
-export async function empresasPermitidas(cliente: OdooClient, login: string): Promise<number[]> {
-	const [utilizador] = await cliente.searchRead<UtilizadorOdoo>('res.users', [['login', '=', login]], {
-		fields: ['company_ids'],
-		limit: 1,
-		lang: LINGUA,
-	});
+export async function nomesDosNucleos(cliente: OdooClient, ids: readonly number[]): Promise<Map<number, string>> {
+	if (ids.length === 0) return new Map();
 
-	// Sem utilizador não se inventa uma lista: quem não é lido não lê.
-	return utilizador?.company_ids ?? [];
-}
-
-/**
- * Os núcleos, pelo id e pelo nome, restritos ao que o utilizador consegue ler.
- *
- * O `res.company` é lido **para os ids que já saíram do `company_ids`** — a lista não nasce daqui,
- * só ganha nomes aqui. É a mesma distinção que o `listarNucleos` da sede faz.
- *
- * Cache partilhada por todos os pedidos deste POP: são nomes de empresas, e o mural pede-os de
- * cinco em cinco segundos.
- */
-export async function lerNucleos(cliente: OdooClient, empresas: readonly number[]): Promise<Map<number, string>> {
-	if (empresas.length === 0) return new Map();
+	const unicos = [...new Set(ids)].sort((a, b) => a - b);
 
 	const cache = typeof caches !== 'undefined' ? caches.default : null;
-	const chave = new Request(CHAVE_NUCLEOS);
+	const chave = new Request(`https://refood-app.interno/cache/nucleos?ids=${unicos.join(',')}`);
 
 	const guardada = await cache?.match(chave);
 	if (guardada) return new Map(await guardada.json<[number, string][]>());
 
-	const linhas = await cliente.searchRead<NucleoOdoo>('res.company', [['id', 'in', [...empresas]]], {
+	const linhas = await cliente.searchRead<NucleoOdoo>('res.company', [['id', 'in', unicos]], {
 		fields: ['name'],
 		limit: LIMITE_EMPRESAS,
 		lang: LINGUA,
@@ -87,20 +78,4 @@ export async function lerNucleos(cliente: OdooClient, empresas: readonly number[
 	await cache?.put(chave, Response.json(porId, { headers: { 'cache-control': `max-age=${CACHE_NUCLEOS_S}` } }));
 
 	return new Map(porId);
-}
-
-/** O cliente e o âmbito, juntos, porque nenhuma leitura desta app deve acontecer sem os dois. */
-export interface LigacaoOdoo {
-	readonly cliente: OdooClient;
-	/** Para o `allowed_company_ids` de cada leitura. Vazio quer dizer "não lê nada", e não "lê tudo". */
-	readonly empresas: readonly number[];
-	readonly nucleos: ReadonlyMap<number, string>;
-}
-
-export async function ligarAoOdoo(env: Env): Promise<LigacaoOdoo> {
-	const cliente = createOdooClient(env);
-	const empresas = await empresasPermitidas(cliente, env.ODOO_USERNAME ?? '');
-	const nucleos = await lerNucleos(cliente, empresas);
-
-	return { cliente, empresas, nucleos };
 }

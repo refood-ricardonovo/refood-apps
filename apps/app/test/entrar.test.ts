@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { digitosDoNif, ehVoluntario, excedeTentativas, padraoFrouxo, rotaEntrar } from '../src/entrar';
+import { digitosDoNif, excedeTentativas, padraoFrouxo, rotaEntrar } from '../src/entrar';
 import { novaBase, type D1Falso } from './d1-falso';
 
 /* --------------------------------------------------------------- as puras */
@@ -39,20 +39,6 @@ describe('o padrão da segunda passagem', () => {
 		const padrao = padraoFrouxo('123456789');
 		expect(padrao.startsWith('%')).toBe(false);
 		expect(padrao.endsWith('%')).toBe(false);
-	});
-});
-
-describe('o sufixo do barcode', () => {
-	/**
-	 * **Verifica-se aqui e nunca num domínio**: `_` é wildcard de um caractere no `LIKE` do SQL, e
-	 * `['barcode', 'like', '%_VL']` casaria com `XVL`, `1VL` e tudo o que acabe em três caracteres
-	 * terminados em `VL`.
-	 */
-	it('exige _VL a terminar, com o underscore literal', () => {
-		expect(ehVoluntario('PTABF_VL000123_VL')).toBe(true);
-		expect(ehVoluntario('PTABF000123XVL')).toBe(false);
-		expect(ehVoluntario('PTABF000123_BF')).toBe(false);
-		expect(ehVoluntario(false)).toBe(false);
 	});
 });
 
@@ -210,8 +196,11 @@ describe('POST /api/entrar', () => {
 			['vat', '=', '123456789'],
 			['active', '=', true],
 		]);
-		// O âmbito vai no contexto, e sai do `company_ids` do utilizador — nunca de `res.company`.
-		expect((pesquisa?.kwargs.context as Record<string, unknown>).allowed_company_ids).toEqual([75, 76]);
+		// **Sem âmbito no contexto**: esta rota existe para descobrir o núcleo e não o pode
+		// restringir antes de o conhecer. O tecto é o da conta, e é o Odoo que o impõe.
+		expect((pesquisa?.kwargs.context as Record<string, unknown>)?.allowed_company_ids).toBeUndefined();
+		// E o núcleo sai do `company_id` da própria ficha, sem uma segunda leitura a `res.company`.
+		expect(chamadas.some((c) => c.modelo === 'res.users' || c.modelo === 'res.company')).toBe(false);
 
 		const { results } = await base.prepare('SELECT employee_id, company_id FROM presencas_demo').all();
 		expect(results).toEqual([{ employee_id: 42, company_id: 75 }]);
@@ -263,16 +252,23 @@ describe('POST /api/entrar', () => {
 		expect(results).toEqual([{ employee_id: 42 }]);
 	});
 
-	/** Sem `_VL` no barcode não é voluntário, e a rota encaminha para o núcleo. */
-	it('descarta quem não tem barcode de voluntário', async () => {
-		const { stub } = odooFalso({ 'hr.employee': [{ ...FICHA, barcode: 'PTABF000123_BF' }], ...RESPOSTAS_BASE });
+	/**
+	 * **Encontrar a ficha activa é a resposta, e o `barcode` não entra na decisão.** A rota exigia
+	 * `_VL` no fim do código de barras; um voluntário sem código, ou com outro sufixo, não
+	 * conseguia entrar. O núcleo continua a sair do `company_id` da ficha.
+	 */
+	it('aceita a ficha seja qual for o barcode, e mesmo sem barcode', async () => {
+		const { stub } = odooFalso({ 'hr.employee': [{ ...FICHA, barcode: false }], ...RESPOSTAS_BASE });
 		vi.stubGlobal('fetch', stub);
 
 		const resposta = await rotaEntrar(pedir('123456789'), envDe(base));
+		const corpo = (await resposta.json()) as { ok: boolean; nucleo: string };
 
-		expect(resposta.status).toBe(404);
-		const { results } = await base.prepare('SELECT COUNT(*) AS n FROM presencas_demo').all<{ n: number }>();
-		expect(results[0]?.n).toBe(0);
+		expect(resposta.status).toBe(200);
+		expect(corpo).toEqual({ ok: true, nome: 'Maria C.', nucleo: 'Refood Benfica' });
+
+		const { results } = await base.prepare('SELECT employee_id, company_id FROM presencas_demo').all();
+		expect(results).toEqual([{ employee_id: 42, company_id: 75 }]);
 	});
 
 	/**
