@@ -55,3 +55,45 @@ export function nomeCurto(fullName: unknown, name?: unknown): string | null {
 
 	return primeiro;
 }
+
+/* ------------------------------------------------------- o nome de um núcleo */
+
+/**
+ * O nome de um núcleo como ele sai do Odoo — *PT Núcleo Leiria* — e como ele aparece em cada ecrã.
+ *
+ * **O `PT` da frente é a convenção de nomes do Odoo, não informação.** Toda a empresa que é núcleo o
+ * traz, portanto não distingue nada e ocupa espaço em ecrãs onde o espaço é o recurso escasso. Sai
+ * nas duas superfícies.
+ *
+ * **A palavra "Núcleo" só sai no mural**, e a diferença é deliberada:
+ *
+ * - no telemóvel aparece **uma vez**, a confirmar a quem acabou de entrar de onde é que ele é, e
+ *   ali mais texto lê-se melhor — *Núcleo Leiria*;
+ * - no mural aparece **em todas as linhas da coluna**, e é a única palavra que não distingue nenhuma
+ *   delas — *Leiria*.
+ *
+ * **Nunca devolve vazio.** Se tirar os prefixos não sobrar nada — um núcleo que se chame só *PT
+ * Núcleo* —, devolve-se o nome como veio: um nome estranho no ecrã é melhor do que uma linha em
+ * branco, que ninguém sabe ler.
+ */
+function semPrefixos(nome: unknown, prefixos: readonly RegExp[]): string | null {
+	if (typeof nome !== 'string') return null;
+
+	const original = nome.trim().replace(/\s+/g, ' ');
+	if (original === '') return null;
+
+	let curto = original;
+	for (const prefixo of prefixos) curto = curto.replace(prefixo, '').trim();
+
+	return curto === '' ? original : curto;
+}
+
+/** `PT` fora, o resto fica: *PT Núcleo Leiria* → *Núcleo Leiria*. Para o ecrã de quem entrou. */
+export function nucleoDaEntrada(nome: unknown): string | null {
+	return semPrefixos(nome, [/^PT\b/i]);
+}
+
+/** `PT` e `Núcleo` fora: *PT Núcleo Leiria* → *Leiria*. Para a coluna do mural. */
+export function nucleoDoMural(nome: unknown): string | null {
+	return semPrefixos(nome, [/^PT\b/i, /^N[úu]cleo\b/i]);
+}

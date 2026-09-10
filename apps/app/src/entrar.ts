@@ -50,7 +50,7 @@
  */
 
 import { createOdooClient, many2one } from '@refood/odoo';
-import { nomeCurto } from './nomes';
+import { nomeCurto, nucleoDaEntrada } from './nomes';
 import { entradaAberta } from './interruptor';
 import { LINGUA } from './odoo';
 
@@ -234,6 +234,6 @@ export async function rotaEntrar(request: Request, env: Env): Promise<Response> 
 	return Response.json({
 		ok: true,
 		nome: nomeCurto(ficha.full_name, ficha.name),
-		nucleo: nucleo.nome,
+		nucleo: nucleoDaEntrada(nucleo.nome),
 	});
 }

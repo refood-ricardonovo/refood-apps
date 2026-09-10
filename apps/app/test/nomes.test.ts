@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nomeCurto, primeiroNome } from '../src/nomes';
+import { nomeCurto, nucleoDaEntrada, nucleoDoMural, primeiroNome } from '../src/nomes';
 
 /**
  * **Nenhum destes casos é de laboratório.** O `full_name` está vazio em cerca de 430 fichas activas,
@@ -58,5 +58,40 @@ describe('o nome curto, para quem se acabou de identificar', () => {
 	 */
 	it('mostra mais do que o mural, e é de propósito', () => {
 		expect(nomeCurto('Maria Costa')).not.toBe(primeiroNome('Maria Costa'));
+	});
+});
+
+/**
+ * **O `PT` da frente é convenção de nomes do Odoo e não informação** — todo o núcleo o traz. A
+ * palavra "Núcleo" sai só no mural, onde se repetiria em cada linha da coluna sem distinguir
+ * nenhuma; no telemóvel aparece uma vez e ali mais texto lê-se melhor.
+ */
+describe('o nome de um núcleo, por superfície', () => {
+	it('no telemóvel tira o PT e deixa a palavra Núcleo', () => {
+		expect(nucleoDaEntrada('PT Núcleo Leiria')).toBe('Núcleo Leiria');
+	});
+
+	it('no mural tira o PT e o Núcleo', () => {
+		expect(nucleoDoMural('PT Núcleo Leiria')).toBe('Leiria');
+	});
+
+	it('deixa em paz um nome que não traga os prefixos', () => {
+		expect(nucleoDaEntrada('Refood Benfica')).toBe('Refood Benfica');
+		expect(nucleoDoMural('Refood Benfica')).toBe('Refood Benfica');
+	});
+
+	/** O prefixo é uma palavra, não duas letras: um núcleo chamado *PTolomeu* fica inteiro. */
+	it('não corta uma palavra que apenas comece por PT', () => {
+		expect(nucleoDoMural('PTolomeu')).toBe('PTolomeu');
+	});
+
+	/** Um ecrã com uma linha em branco não se lê. Melhor o nome estranho do que nada. */
+	it('devolve o nome como veio se tirar os prefixos não deixar nada', () => {
+		expect(nucleoDoMural('PT Núcleo')).toBe('PT Núcleo');
+	});
+
+	it('devolve null quando não há nome', () => {
+		expect(nucleoDoMural(false)).toBeNull();
+		expect(nucleoDaEntrada('   ')).toBeNull();
 	});
 });

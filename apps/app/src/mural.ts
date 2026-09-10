@@ -3,10 +3,14 @@
  *
  * ## Duas metades, com origens diferentes, e é isso que a torna barata
  *
- * **As contagens e a ordem saem do D1, por SQL.** Um `GROUP BY company_id` com `COUNT(*)` e
- * `MIN(criado_em)` responde a tudo o que a coluna da esquerda mostra, e não passa pelo Odoo. É
- * também o que faz **a contagem incluir toda a gente, sem excepção**: quem entrou e cuja ficha não
- * devolve nome legível conta na mesma — só não aparece na nuvem.
+ * **A ordem sai do D1, por SQL.** Um `GROUP BY company_id` com `MIN(criado_em)` dá a coluna da
+ * esquerda inteira — que núcleos estão presentes, pela ordem em que o primeiro voluntário de cada
+ * um chegou — e não passa pelo Odoo.
+ *
+ * **Não há contagens, e é decisão e não esquecimento.** Havia um total no topo e um número por
+ * núcleo; saíram os dois a pedido, e saíram também da resposta e não só do ecrã — um endereço
+ * público a publicar quantas pessoas de cada núcleo estão numa sala, que nada mostra, é dado a
+ * mais sem ninguém a lê-lo. A coluna diz **quem está presente**, não quantos.
  *
  * **Os nomes saem do Odoo, e só os das chegadas novas.** A versão anterior lia todos os presentes a
  * cada sonda: com 300 pessoas e cinco segundos, eram 3 600 fichas por minuto contra uma base
@@ -41,7 +45,7 @@
 
 import { createOdooClient } from '@refood/odoo';
 import { entradaAberta } from './interruptor';
-import { primeiroNome } from './nomes';
+import { nucleoDoMural, primeiroNome } from './nomes';
 import { LINGUA, nomesDosNucleos } from './odoo';
 
 /** Tectos das leituras. Há 87 núcleos na base, e uma sala não tem mais gente do que isto. */
@@ -49,18 +53,12 @@ const LIMITE_NUCLEOS = 200;
 const LIMITE_NOVOS = 100;
 
 type FichaOdoo = { id: number; full_name: string | false; name?: string | false };
-type GrupoSql = { company_id: number; total: number; primeiro: string };
+type GrupoSql = { company_id: number; primeiro: string };
 type ChegadaSql = { employee_id: number; criado_em: string };
 
-export interface NucleoDoMural {
-	readonly nucleo: string;
-	readonly total: number;
-}
-
 export interface Mural {
-	/** Por ordem de chegada do primeiro voluntário de cada núcleo. */
-	readonly nucleos: readonly NucleoDoMural[];
-	readonly total: number;
+	/** Os nomes dos núcleos presentes, por ordem de chegada do primeiro voluntário de cada um. */
+	readonly nucleos: readonly string[];
 	/** Os primeiros nomes de quem entrou desde a sonda anterior, por ordem de chegada. */
 	readonly novos: readonly string[];
 	/** O cursor da sonda seguinte. */
@@ -72,21 +70,18 @@ export async function rotaMural(request: Request, env: Env): Promise<Response> {
 	const agora = new Date().toISOString();
 
 	if (!entradaAberta(env)) {
-		return Response.json({ ok: true, mural: { nucleos: [], total: 0, novos: [], agora } });
+		return Response.json({ ok: true, mural: { nucleos: [], novos: [], agora } });
 	}
 
 	/*
-	 * **A coluna sai daqui, e só daqui.** `COUNT(*)` conta toda a gente que entrou; `MIN(criado_em)`
-	 * é a ordem — por chegada do primeiro voluntário de cada núcleo, e não alfabética, porque é a
-	 * ordem em que a sala se encheu.
+	 * **A coluna sai daqui, e só daqui.** `MIN(criado_em)` é a ordem — por chegada do primeiro
+	 * voluntário de cada núcleo, e não alfabética, porque é a ordem em que a sala se encheu.
 	 */
 	const grupos = await env.DB.prepare(
-		'SELECT company_id, COUNT(*) AS total, MIN(criado_em) AS primeiro FROM presencas_demo GROUP BY company_id ORDER BY primeiro ASC LIMIT ?',
+		'SELECT company_id, MIN(criado_em) AS primeiro FROM presencas_demo GROUP BY company_id ORDER BY primeiro ASC LIMIT ?',
 	)
 		.bind(LIMITE_NUCLEOS)
 		.all<GrupoSql>();
-
-	const total = grupos.results.reduce((s, g) => s + g.total, 0);
 
 	// Sem `desde` não há nomes a mostrar — ver o cabeçalho. Também não se toca no Odoo por causa
 	// disso: só falta traduzir os núcleos, que vem de cache.
@@ -101,7 +96,7 @@ export async function rotaMural(request: Request, env: Env): Promise<Response> {
 		: { results: [] as ChegadaSql[] };
 
 	if (grupos.results.length === 0) {
-		return Response.json({ ok: true, mural: { nucleos: [], total: 0, novos: [], agora } });
+		return Response.json({ ok: true, mural: { nucleos: [], novos: [], agora } });
 	}
 
 	const cliente = createOdooClient(env);
@@ -148,12 +143,13 @@ export async function rotaMural(request: Request, env: Env): Promise<Response> {
 	const ultima = chegadas.results[chegadas.results.length - 1];
 	const cursor = chegadas.results.length === LIMITE_NOVOS && ultima ? ultima.criado_em : agora;
 
-	const lista: NucleoDoMural[] = grupos.results.map((g) => ({
-		nucleo: nucleos.get(g.company_id) ?? `Núcleo ${g.company_id}`,
-		total: g.total,
-	}));
+	/*
+	 * O nome curto — sem o `PT` e sem a palavra `Núcleo`, que se repetiria em todas as linhas. O
+	 * recurso é o id: uma linha sem nome não se lê, e um núcleo que está na sala tem de aparecer.
+	 */
+	const lista = grupos.results.map((g) => nucleoDoMural(nucleos.get(g.company_id)) ?? `Núcleo ${g.company_id}`);
 
-	return Response.json({ ok: true, mural: { nucleos: lista, total, novos, agora: cursor } });
+	return Response.json({ ok: true, mural: { nucleos: lista, novos, agora: cursor } });
 }
 
 /**

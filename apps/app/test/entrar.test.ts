@@ -289,6 +289,20 @@ describe('POST /api/entrar', () => {
 		expect(JSON.stringify(corpo)).not.toContain('Ana');
 	});
 
+	/**
+	 * **O `PT` da frente do nome do núcleo não vai para o ecrã.** É convenção de nomes do Odoo —
+	 * todo o núcleo o traz — e no telemóvel fica *Núcleo Leiria*. Ver `nomes.ts`.
+	 */
+	it('mostra o núcleo sem o PT da frente', async () => {
+		const { stub } = odooFalso({ 'hr.employee': [{ ...FICHA, company_id: [88, 'PT Núcleo Leiria'] }], ...RESPOSTAS_BASE });
+		vi.stubGlobal('fetch', stub);
+
+		const resposta = await rotaEntrar(pedir('123456789'), envDe(base));
+		const corpo = (await resposta.json()) as { nucleo: string };
+
+		expect(corpo.nucleo).toBe('Núcleo Leiria');
+	});
+
 	it('trava à décima primeira tentativa da mesma origem', async () => {
 		const { stub } = odooFalso({ 'hr.employee': [], ...RESPOSTAS_BASE });
 		vi.stubGlobal('fetch', stub);

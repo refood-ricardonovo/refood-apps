@@ -145,13 +145,13 @@
 			.resposta {
 				min-height: 4em;
 				text-align: center;
-				font-size: 20px;
+				font-size: 26px;
 				line-height: 1.4;
 			}
 
 			.resposta b {
 				display: block;
-				font-size: 30px;
+				font-size: 40px;
 				font-weight: 700;
 			}
 
@@ -296,7 +296,15 @@
 
 					if (corpo.ok) {
 						mostrar('ok', corpo.nucleo ?? '', `Olá, ${corpo.nome ?? ''}`);
-						campo.value = '';
+						/*
+						 * **Entrou: o formulário sai do ecrã e não volta.** A label, a caixa e o botão vão
+						 * juntos porque são o mesmo `<form>`, e fica só a saudação — que é o que a pessoa
+						 * mostra a quem está ao lado.
+						 *
+						 * Não há "entrar com outro NIF", por decisão: uma pessoa, um telemóvel. Quem
+						 * precisar de entrar noutro aparelho fecha o browser e abre outra vez.
+						 */
+						entrada.hidden = true;
 					} else {
 						// O `erro` que o servidor devolve é o que escolhe a cor: só o `formato` sai a
 						// vermelho. Ver o CSS.

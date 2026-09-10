@@ -87,20 +87,20 @@ Every part of it is load-bearing. **"Ainda"** removes the finality. **"Há ficha
 
 The room is around 300 people and the screen is read from ten metres. That forced the shape:
 
-- **The left column is state.** Which núcleos are present and how many of each, ordered by **when the first volunteer of each núcleo arrived** — the order the room filled, not the alphabet. It stays.
-- **The cloud is event.** Each first name appears **once**, when that person walks in: fade in, six seconds, fade out, gone. Nothing is recycled to fill the screen — a name on that wall means someone just arrived, and a name that came back would be a lie about the room.
+- **The left column is state.** Which núcleos are present, ordered by **when the first volunteer of each núcleo arrived** — the order the room filled, not the alphabet. It stays. **No counts:** there was a total in the header and a number per núcleo, and both went at the sede's request. They went from the response too and not just from the screen — a public endpoint publishing how many people from each núcleo are in a room, that nothing displays, is data with no reader. The column says **who is present**, not how many.
+- **The cloud is event.** Each first name appears **once**, when that person walks in: fade in, **nine seconds**, fade out, gone. Nothing is recycled to fill the screen — a name on that wall means someone just arrived, and a name that came back would be a lie about the room.
 
 **`GET /api/mural?desde=<iso>` reads a window, not a list.** The window is `(desde, agora]`, with `agora` fixed at the first instant of the request and returned as the next cursor, so two consecutive polls abut with no gap and no overlap.
 
 ### The first poll brings no names, and that is not a bug
 
-**Write this down before someone "fixes" it in a year.** A poll without `desde` returns the counts and a cursor, and an empty list of names.
+**Write this down before someone "fixes" it in a year.** A poll without `desde` returns the list of núcleos and a cursor, and an empty list of names.
 
-The reason is the split above: **the cloud is what is happening, the column is the state.** Someone who opens the mural halfway through the session gets everybody's counts, correct, and does not get a burst of two hundred names that arrived while nobody was projecting. **Whoever was not watching, did not see it.** The same applies to a mid-session reload: the board keeps its counts and the cloud picks up from that moment.
+The reason is the split above: **the cloud is what is happening, the column is the state.** Someone who opens the mural halfway through the session gets every núcleo that is present, correct, and does not get a burst of two hundred names that arrived while nobody was projecting. **Whoever was not watching, did not see it.** The same applies to a mid-session reload: the board keeps its column and the cloud picks up from that moment.
 
-### The counts come from the `GROUP BY`, never from Odoo
+### The column comes from the `GROUP BY`, never from Odoo
 
-`COUNT(*)` per `company_id` counts **everyone who came in, without exception** — including anyone whose ficha returns no readable name. That person counts in the column and simply does not appear in the cloud. The previous version derived the counts from the Odoo read and dropped them from both, silently.
+A `GROUP BY company_id` with `MIN(criado_em)` puts a núcleo on the column **as soon as anyone from it walks in, without exception** — including someone whose ficha returns no readable name. That person puts their núcleo on the board and simply does not appear in the cloud. The version before this one derived the column from the Odoo read and dropped such a person from both, silently.
 
 It also makes the mural cheap. The old version read every present volunteer on every poll: at 300 people and five seconds, 3 600 fichas a minute against an on-premise database, to redraw a screen that barely changes. Now a poll where nobody arrived is **one SQL query and zero calls to Odoo**.
 
@@ -108,15 +108,17 @@ It also makes the mural cheap. The old version read every present volunteer on e
 
 The window is open on the left (`criado_em > desde`). Two entries in the **same millisecond** on a poll boundary would drop one.
 
-**The consequence is not a wrong count.** A name is lost from the cloud; the núcleo's count stays right, because it comes from the `GROUP BY` and not from this window. Someone walks in, the left column goes up, and their name does not cross the screen.
+**The consequence is not a wrong column.** A name is lost from the cloud; the núcleo stays on the board, because the column comes from the `GROUP BY` and not from this window. Someone walks in and their name does not cross the screen.
 
-**That is precisely why an `employee_id` does not go in the payload.** Breaking the tie would mean publishing a stable identifier for a real person on a public, unauthenticated page — permanently — to avoid, in a case that needs two people pressing the button in the same millisecond, one name not showing for six seconds. The identifier is forever; the missed name lasts six seconds.
+**That is precisely why an `employee_id` does not go in the payload.** Breaking the tie would mean publishing a stable identifier for a real person on a public, unauthenticated page — permanently — to avoid, in a case that needs two people pressing the button in the same millisecond, one name not showing for nine seconds. The identifier is forever; the missed name lasts nine seconds.
 
 ### The queue tightens on a curve, not on a step
 
 Ten names appearing at once is unreadable, so arrivals queue and enter spaced out. But a fixed half-second sustains two names a second, and 300 people arriving over two minutes build a queue that only drains after the room has sat down.
 
-The interval shortens with the queue — `min + (max - min) / (1 + n / 4)`, between **500 ms and a floor of 200 ms**. Empty queue, 500 ms; four waiting, 350; twenty, 250; never below 200. It is a curve and it is recomputed before each name, so **there is no visible jump** the way a threshold would give one.
+The interval shortens with the queue — `min + (max - min) / (1 + n / 4)`, between **900 ms and a floor of 400 ms**. Empty queue, 900 ms; four waiting, 650; twenty, 483; never below 400. It is a curve and it is recomputed before each name, so **there is no visible jump** the way a threshold would give one.
+
+**Those numbers went up when the name went up.** At nine seconds on screen and the old 500 ms, more than twenty big names lived on the wall at once, in twenty cells — that is not a cloud, it is a wall of text. The grid went from six columns to five for the same reason. The queue drains slower, and that is the right trade: what was asked for was the name bigger and on screen longer.
 
 ## The manifest declares `id` explicitly
 
@@ -184,3 +186,23 @@ The order matters, and each step is the user's to run — **never against produc
 2. **`npm run deploy:producao` before the secrets.** `wrangler secret put` needs the worker to exist. A worker deployed with no secrets is not a broken state: with `ENTRADA_ABERTA` absent the switch is closed, and the closed page is the correct thing to serve on every day but one.
 3. `ODOO_USERNAME` and `ODOO_PASSWORD`, then `ENTRADA_ABERTA=aberta` **on the day only**.
 4. **Afterwards: turn the switch off and empty the table.** `wrangler secret delete ENTRADA_ABERTA` and `DELETE FROM presencas_demo`. That is the whole cleanup, and it is not automatic — the fence in the section above is exactly this step being taken.
+
+## The top bar and the footer carry the address, and the QR is a committed file
+
+The bar is the logo on the left, **`myrefood.pt` in yellow in the middle**, and a **QR code** on the right that resolves to the same address. The footer is low on purpose — it steals the least from the cloud — with _10º ENC Nacional | Viseu_ on the left and _Equipa Executiva Odoo_ on the right.
+
+**The QR is `public/img/qr-myrefood.svg`, generated once and committed.** It was produced with `npx qrcode` — level Q, a 4-module quiet zone, dark modules on white — and **nothing about it exists at runtime**: no library on the page, no generation, no fetch. Same pattern as the icons, which came out of `sharp` without `sharp` being a dependency of this app. Regenerate it only if the address changes:
+
+```bash
+npx --yes qrcode -t svg -e Q -q 4 -d 0f0f0f -l ffffff -o public/img/qr-myrefood.svg "https://myrefood.pt"
+```
+
+**The logo grew with the bar, and 88 px is a limit and not a maximum.** The QR makes the bar 160 px tall, and the 46 px logo that used to sit in a 74 px bar was lost in it. What caps the logo is the protection margin `docs/design.md` fixes — the height of the "F" in FOOD, all around, which at this size is ~34 px and is exactly what is left between the logo, the 20 px padding and the 120 px QR. Filling the bar to 120 px would gain presence and lose the margin.
+
+**The resting "Obrigado" is translucent, at 35%.** At full strength a yellow that size pulled the room towards a word that is background rather than event — the names are the screen. It is `opacity` and not a darker yellow, so that the day the ground changes there is no second yellow to reconcile.
+
+**Dark modules on white, never inverted and never in the brand yellow.** Some readers will not read an inverted QR, and a QR that fails on a projected screen gets no second attempt. The quiet zone is inside the file, so no CSS decision can eat it.
+
+**A QR in a header bar is close-range, and the address next to it is why.** The rule of thumb is a readable distance of about ten times the side of the code: at 120 px on a 1080p projection about 2.2 m wide, the code is ~14 cm across, so it reads from a metre or two, or with a phone's zoom. Whoever is at the back of the room types the address — that is what it is doing there. If it ever has to be scannable from the back rows, that is a slide of its own, not a bar.
+
+**The Odoo purple in the footer is lightened, and that is deliberate.** The brand `#714b67` on `#0f0f0f` is dark on dark and unreadable at ten metres; `#c79bc0` is the same hue with enough light to survive a projector. An exact purple nobody can see is not the purple.

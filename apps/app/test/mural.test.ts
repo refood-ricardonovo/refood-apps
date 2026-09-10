@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { rotaMural, rotaReiniciarMural } from '../src/mural';
 import { novaBase, type D1Falso } from './d1-falso';
 
-type Mural = { nucleos: { nucleo: string; total: number }[]; total: number; novos: string[]; agora: string };
+type Mural = { nucleos: string[]; novos: string[]; agora: string };
 
 /** O mesmo Odoo de mentira do `entrar.test.ts`: JSON-RPC, com o cliente a sério por cima. */
 function odooFalso(porModelo: Record<string, unknown[]>) {
@@ -79,7 +79,6 @@ describe('GET /api/mural', () => {
 		const corpo = (await (await rotaMural(pedir(), envDe(base))).json()) as { mural: Mural };
 
 		expect(corpo.mural.nucleos).toEqual([]);
-		expect(corpo.mural.total).toBe(0);
 		expect(stub).not.toHaveBeenCalled();
 	});
 
@@ -94,26 +93,26 @@ describe('GET /api/mural', () => {
 
 		const corpo = (await (await rotaMural(pedir(), envDe(base, ''))).json()) as { mural: Mural };
 
-		expect(corpo.mural.total).toBe(0);
+		expect(corpo.mural.nucleos).toEqual([]);
 		expect(stub).not.toHaveBeenCalled();
 	});
 
 	/**
-	 * **O corpo fechado tem de trazer as quatro chaves que a página lê.**
+	 * **O corpo fechado tem de trazer as três chaves que a página lê.**
 	 *
 	 * Fechado é o estado normal a partir do dia seguinte à apresentação, e o `/mural` fica público em
-	 * produção — portanto a resposta fechada é a que aquela página vê quase sempre. Com as quatro
-	 * chaves presentes ela desenha uma coluna vazia e o "À espera…", e não parte; se alguém
-	 * "simplificar" isto para `{}` daqui a seis meses, é aqui que rebenta e não no projector.
+	 * produção — portanto a resposta fechada é a que aquela página vê quase sempre. Com as três chaves
+	 * presentes ela desenha uma coluna vazia e o "Obrigado", e não parte; se alguém "simplificar" isto
+	 * para `{}` daqui a seis meses, é aqui que rebenta e não no projector.
 	 */
-	it('o corpo fechado traz as quatro chaves que a página lê', async () => {
+	it('o corpo fechado traz as três chaves que a página lê', async () => {
 		await inserir(base, 42, 75, T(0));
 		const { stub } = odooFalso({});
 		vi.stubGlobal('fetch', stub);
 
 		const corpo = (await (await rotaMural(pedir(), envDe(base, ''))).json()) as { mural: Mural };
 
-		expect(Object.keys(corpo.mural).sort()).toEqual(['agora', 'novos', 'nucleos', 'total']);
+		expect(Object.keys(corpo.mural).sort()).toEqual(['agora', 'novos', 'nucleos']);
 		expect(corpo.mural.nucleos).toEqual([]);
 		expect(corpo.mural.novos).toEqual([]);
 		expect(Date.parse(corpo.mural.agora)).not.toBeNaN();
@@ -121,10 +120,10 @@ describe('GET /api/mural', () => {
 
 	/**
 	 * **A primeira sonda não traz nomes, e não é um caso por tratar.** A nuvem é o que está a
-	 * acontecer; a coluna é o estado. Quem abre o mural a meio vê as contagens certas de toda a
-	 * gente e não vê passar quem já entrou — porque isso já aconteceu.
+	 * acontecer; a coluna é o estado. Quem abre o mural a meio vê os núcleos presentes e não vê
+	 * passar quem já entrou — porque isso já aconteceu.
 	 */
-	it('a primeira sonda traz contagens e cursor, e nenhum nome', async () => {
+	it('a primeira sonda traz os núcleos e o cursor, e nenhum nome', async () => {
 		await inserir(base, 42, 75, T(0));
 		await inserir(base, 43, 75, T(1));
 
@@ -133,7 +132,7 @@ describe('GET /api/mural', () => {
 
 		const corpo = (await (await rotaMural(pedir(), envDe(base))).json()) as { mural: Mural };
 
-		expect(corpo.mural.total).toBe(2);
+		expect(corpo.mural.nucleos).toEqual(['Refood Benfica']);
 		expect(corpo.mural.novos).toEqual([]);
 		expect(Date.parse(corpo.mural.agora)).not.toBeNaN();
 
@@ -198,31 +197,27 @@ describe('GET /api/mural', () => {
 
 		const corpo = (await (await rotaMural(pedir(), envDe(base))).json()) as { mural: Mural };
 
-		expect(corpo.mural.nucleos).toEqual([
-			{ nucleo: 'Refood Almada', total: 2 },
-			{ nucleo: 'Refood Benfica', total: 1 },
-		]);
+		expect(corpo.mural.nucleos).toEqual(['Refood Almada', 'Refood Benfica']);
 	});
 
 	/**
-	 * **A contagem conta todos os que entraram, sem excepção.**
+	 * **O núcleo aparece na coluna mesmo que ninguém dali tenha nome legível.**
 	 *
-	 * Sai do `GROUP BY` e não da leitura ao Odoo: quem entrou e cuja ficha não devolve nome legível
-	 * conta na mesma — só não aparece na nuvem. A versão anterior deitava essa pessoa fora das duas
-	 * coisas, e ninguém dava por ela.
+	 * A coluna sai do `GROUP BY` e não da leitura ao Odoo: quem entrou e cuja ficha não devolve nome
+	 * conta para o núcleo estar presente — só não aparece na nuvem. A versão anterior deitava essa
+	 * pessoa fora das duas coisas, e ninguém dava por ela.
 	 */
-	it('conta quem entrou mesmo que a ficha não devolva nome', async () => {
+	it('mostra o núcleo mesmo que a ficha não devolva nome', async () => {
 		await inserir(base, 42, 75, T(2));
 		await inserir(base, 43, 75, T(3));
 
 		// O Odoo só devolve uma das duas fichas, e sem nome nenhum.
-		const { stub } = odooFalso({ ...RESPOSTAS_BASE, 'hr.employee': [{ id: 42, full_name: false, name: false, company_id: [75, 'x'] }] });
+		const { stub } = odooFalso({ ...RESPOSTAS_BASE, 'hr.employee': [{ id: 42, full_name: false, name: false }] });
 		vi.stubGlobal('fetch', stub);
 
 		const corpo = (await (await rotaMural(pedir(T(1)), envDe(base))).json()) as { mural: Mural };
 
-		expect(corpo.mural.total).toBe(2);
-		expect(corpo.mural.nucleos[0]?.total).toBe(2);
+		expect(corpo.mural.nucleos).toEqual(['Refood Benfica']);
 		expect(corpo.mural.novos).toEqual([]);
 	});
 
@@ -246,8 +241,8 @@ describe('GET /api/mural', () => {
 		const corpo = (await (await rotaMural(pedir(T(0)), envDe(base))).json()) as { mural: Mural };
 
 		expect(corpo.mural.novos).toEqual(['Maria']);
-		// Mas conta, porque a contagem é de toda a tabela.
-		expect(corpo.mural.total).toBe(2);
+		// Mas o núcleo está presente, porque a coluna é de toda a tabela.
+		expect(corpo.mural.nucleos).toEqual(['Refood Benfica']);
 	});
 
 	/** Nada no D1 identifica ninguém: dois inteiros e uma data. Este teste guarda essa fronteira. */

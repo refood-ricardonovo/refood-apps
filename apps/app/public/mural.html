@@ -24,9 +24,10 @@
 			 * nenhum `<a>`, nenhum campo — quem está à frente do projector não é quem o opera, e um
 			 * elemento focável num ecrã projectado é um elemento que alguém carrega por engano.
 			 *
-			 * **Duas metades com naturezas diferentes.** A coluna da esquerda é **estado**: quem está
-			 * na sala, por núcleo, e fica. A área principal é **acontecimento**: cada nome passa uma
-			 * vez, quando a pessoa entra, e desaparece. Nada se recicla para encher o ecrã.
+			 * **Duas metades com naturezas diferentes.** A coluna da esquerda é **estado**: que núcleos
+			 * estão na sala, e ficam — sem contagens, por decisão. A área principal é **acontecimento**:
+			 * cada nome passa uma vez, quando a pessoa entra, e desaparece. Nada se recicla para encher
+			 * o ecrã.
 			 *
 			 * Mesmo fundo da página de entrada, pela mesma razão: é a mesma demonstração. Não é uma
 			 * decisão sobre o aspecto da PWA — ver o CLAUDE.md desta app.
@@ -47,32 +48,68 @@
 				font-family: var(--fonte);
 				font-weight: 500; /* sobre fundo escuro, o 400 esvai-se a dez metros */
 				display: grid;
-				grid-template-rows: auto 1fr;
+				grid-template-rows: auto 1fr auto;
 				overflow: hidden;
 			}
 
+			/*
+			 * A barra de cima: logótipo à esquerda, o endereço ao centro, o QR à direita.
+			 *
+			 * Três colunas `1fr auto 1fr` e não um `space-between`: com o `space-between` o endereço
+			 * deslocava-se para o lado do elemento mais estreito, e o que se quer é o centro do ecrã.
+			 */
 			header {
-				display: flex;
+				display: grid;
+				grid-template-columns: 1fr auto 1fr;
 				align-items: center;
-				justify-content: space-between;
 				gap: 24px;
 				padding: 20px 32px;
 				border-bottom: 2px solid #2b2b2b;
 			}
 
+			/*
+			 * O logótipo, à altura da barra que o QR criou. Aos 46 px de antes ficava perdido numa barra
+			 * de 160 px, e o logótipo é a primeira coisa que a sala tem de reconhecer.
+			 *
+			 * **Os 88 px são o que a margem de proteção permite**, e não o máximo que caberia: o
+			 * `docs/design.md` fixa uma margem igual à altura do "F" de FOOD em toda a volta — a esta
+			 * altura são uns 34 px, e é o que sobra entre ele, o `padding` de 20 px e o QR de 120 px.
+			 * Encher a barra até aos 120 px ganhava presença e perdia a margem.
+			 *
+			 * **`justify-self: start` não é decoração:** numa grelha, um `<img>` de largura automática
+			 * esticava-se ao tamanho da coluna e o logótipo saía deformado.
+			 */
 			header img {
-				height: 46px;
+				height: 88px;
+				justify-self: start;
 			}
 
-			.conta {
-				font-size: 26px;
-				color: #9a9a9a;
-			}
-
-			.conta b {
-				color: var(--marca-amarelo);
-				font-size: 40px;
+			/* O endereço, para quem está na sala escrever no telemóvel sem ler um QR. */
+			.endereco {
+				font-size: 36px;
 				font-weight: 700;
+				color: var(--marca-amarelo);
+			}
+
+			/*
+			 * O QR aponta para `myrefood.pt` e é um SVG **gerado uma vez e comprometido no repositório**:
+			 * a página não carrega biblioteca nenhuma nem gera nada em runtime.
+			 *
+			 * **Módulos escuros sobre branco, com a zona de silêncio dentro do próprio ficheiro.** Há
+			 * leitores que não lêem um QR invertido, e um QR que não lê num ecrã projectado não tem
+			 * segunda tentativa. É também por isso que não leva o amarelo da marca.
+			 *
+			 * **O tamanho é o que a barra dá, e isso limita a distância de leitura**: a regra prática é
+			 * cerca de dez vezes o lado do código. Aos 120 px de um 1080p projectado a ~2,2 m de largura
+			 * são uns 14 cm de lado, portanto lê-se de perto ou com o zoom da câmara — quem está no fundo
+			 * da sala escreve o endereço, que é o que ele ali está a fazer.
+			 */
+			.qr {
+				justify-self: end;
+				display: block;
+				width: 120px;
+				height: 120px;
+				border-radius: 6px;
 			}
 
 			.corpo {
@@ -97,9 +134,9 @@
 			 * volta não tem costura. A duração vem da altura, para a velocidade ser a mesma com dez
 			 * núcleos ou com trinta. Ninguém lhe toca.
 			 *
-			 * **A contagem actualiza-se no sítio, sem tocar na estrutura.** Reconstruir a lista a cada
-			 * entrada reiniciava esta animação e fazia a coluna saltar para o início de cinco em cinco
-			 * segundos. Só a chegada de um **núcleo novo** a reconstrói.
+			 * **Só a chegada de um núcleo novo reconstrói a lista.** Reconstruí-la a cada sonda
+			 * reiniciava esta animação e fazia a coluna saltar para o início de cinco em cinco segundos.
+			 * Como não há contagens a actualizar, uma lista igual não dá trabalho nenhum ao DOM.
 			 */
 			.rolo {
 				padding: 20px 0;
@@ -119,20 +156,36 @@
 			}
 
 			.nucleo {
+				padding: 12px 32px;
+				font-size: 32px;
+				color: #d6d6d6;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			/* ------------------------------------------------------------ o rodapé */
+
+			/*
+			 * Baixo de propósito: rouba o mínimo à nuvem, que é o que a sala está a ver.
+			 *
+			 * **O roxo do Odoo aparece clareado.** O `#714b67` da marca sobre este fundo é escuro sobre
+			 * escuro e a dez metros não se lê; o `#c79bc0` é o mesmo tom com luz suficiente para passar
+			 * num projector. Legibilidade primeiro — um roxo exacto que ninguém vê não é o roxo.
+			 */
+			footer {
 				display: flex;
 				align-items: baseline;
 				justify-content: space-between;
-				gap: 16px;
-				padding: 12px 32px;
-				font-size: 30px;
-				color: #d6d6d6;
-				white-space: nowrap;
+				gap: 24px;
+				padding: 10px 32px;
+				border-top: 2px solid #2b2b2b;
+				font-size: 22px;
+				color: #9a9a9a;
 			}
 
-			.nucleo b {
-				color: var(--marca-amarelo);
-				font-size: 34px;
-				font-weight: 700;
+			footer .odoo {
+				color: #c79bc0;
 			}
 
 			/* ------------------------------------------------------------- a nuvem */
@@ -142,40 +195,53 @@
 				overflow: hidden;
 			}
 
+			/*
+			 * **O estado de repouso da nuvem é um "Obrigado", e é grande.** Só aparece quando não há
+			 * nenhum nome no ecrã, portanto não compete com nada — e ao fim da sessão é o que fica na
+			 * parede. O amarelo é acento sobre fundo escuro, que é o uso que o guia da marca prevê.
+			 *
+			 * **Translúcido de propósito.** A cheio, um amarelo deste tamanho puxava o olhar da sala
+			 * para uma palavra que é fundo, não acontecimento: os nomes é que são o ecrã. A 35% lê-se
+			 * de longe e não se impõe. É opacidade e não uma cor mais escura, para o dia em que o fundo
+			 * mudar não haver um amarelo a mais para acertar.
+			 */
 			.espera {
 				display: grid;
 				place-items: center;
 				height: 100%;
-				font-size: 30px;
-				color: #5a5a5a;
+				font-size: clamp(80px, 13vmin, 200px);
+				font-weight: 800;
+				letter-spacing: -0.02em;
+				color: var(--marca-amarelo);
+				opacity: 0.35;
 			}
 
 			/*
 			 * Um nome da nuvem.
 			 *
-			 * **O corpo mínimo é a conta dos dez metros:** a altura de maiúscula legível é cerca de
-			 * 1/200 da distância — ~5 cm a 10 m —, o que num 1080p projectado a ~2,2 m de largura dá
-			 * perto de 44 px de corpo. É uma conta e não uma medição: vale a pena confirmar no
-			 * projector real antes do dia.
+			 * **O corpo mínimo é a conta dos dez metros:** a altura de maiúscula legível é cerca de 1/200
+			 * da distância — ~5 cm a 10 m —, o que num 1080p projectado a ~2,2 m de largura dá perto de
+			 * 44 px de corpo. O chão está bem acima disso, a pedido: o nome é o que a sala olha.
 			 *
 			 * A variação de tamanho é ±20%, por `--f`, e serve para a nuvem não parecer uma tabela.
 			 *
-			 * **Só branco e o amarelo da marca.** Sem cor por núcleo — uma cor por núcleo obrigava a
-			 * sala a decorar uma legenda para ler um nome — e sem imagens.
+			 * **Só branco e o amarelo da marca.** Sem cor por núcleo — uma cor por núcleo obrigava a sala
+			 * a decorar uma legenda para ler um nome — e sem imagens.
 			 */
 			.nome {
 				position: absolute;
 				transform: translate(-50%, -50%);
 				white-space: nowrap;
-				font-size: calc(clamp(44px, 6vmin, 92px) * var(--f, 1));
+				font-size: calc(clamp(56px, 7.5vmin, 120px) * var(--f, 1));
 				font-weight: 700;
 				opacity: 0;
 				/*
-				 * `fade in` 0,6 s → 6 s visível → `fade out` 0,8 s. Os `%` do keyframe saem daí, e a
-				 * duração total é a soma. O elemento sai do DOM no `animationend`, e é aí que a
-				 * célula da grelha fica livre outra vez.
+				 * `fade in` 0,6 s → **9 s visível** → `fade out` 0,8 s. Os `%` do keyframe saem daí, e a
+				 * duração total é a soma. O elemento sai do DOM no `animationend`, e é aí que a célula da
+				 * grelha fica livre outra vez.
 				 */
-				animation: passar 7.4s ease-in-out forwards;
+				animation: passar 10.4s ease-in-out forwards;
+			}
 			}
 
 			.nome[data-cor='amarelo'] {
@@ -187,11 +253,11 @@
 					opacity: 0;
 					transform: translate(-50%, -50%) scale(0.9);
 				}
-				8% {
+				6% {
 					opacity: 1;
 					transform: translate(-50%, -50%) scale(1);
 				}
-				89% {
+				92% {
 					opacity: 1;
 					transform: translate(-50%, -50%) scale(1);
 				}
@@ -213,7 +279,7 @@
 				}
 
 				.nome {
-					animation: aparecer 7.4s steps(1, end) forwards;
+					animation: aparecer 10.4s steps(1, end) forwards;
 				}
 
 				@keyframes aparecer {
@@ -230,13 +296,23 @@
 	<body>
 		<header>
 			<img src="/img/refood_logo_horizontal_fundo_escuro.svg" alt="Refood" />
-			<span class="conta" id="conta"></span>
+			<span class="endereco">myrefood.pt</span>
+			<!--
+				O `alt` leva o endereço e não a palavra "QR": quem não vê a imagem precisa do destino,
+				não do nome da tecnologia.
+			-->
+			<img class="qr" src="/img/qr-myrefood.svg" alt="myrefood.pt" />
 		</header>
 
 		<div class="corpo">
 			<div class="nucleos"><div class="rolo" id="rolo"></div></div>
-			<div class="nuvem" id="nuvem"><p class="espera" id="espera">À espera…</p></div>
+			<div class="nuvem" id="nuvem"><p class="espera" id="espera">Obrigado</p></div>
 		</div>
+
+		<footer>
+			<span>10º ENC Nacional | Viseu</span>
+			<span class="odoo">Equipa Executiva Odoo</span>
+		</footer>
 
 		<script>
 			/*
@@ -260,41 +336,23 @@
 			const VELOCIDADE_PX_S = 22;
 
 			const rolo = document.getElementById('rolo');
-			const conta = document.getElementById('conta');
 
 			/** Qual era a lista de núcleos da última vez. Só uma lista diferente reconstrói o DOM. */
 			let chaveDosNucleos = '';
-			/** Nome do núcleo → os `<b>` da contagem. Dois, quando o rolo está duplicado. */
-			let contadores = new Map();
 
-			function linhaDeNucleo(n) {
+			function linhaDeNucleo(nome) {
 				const linha = document.createElement('div');
 				linha.className = 'nucleo';
-
-				const nome = document.createElement('span');
-				nome.textContent = n.nucleo;
-
-				const quantos = document.createElement('b');
-				quantos.textContent = n.total;
-
-				linha.append(nome, quantos);
-				return { linha, quantos };
+				linha.textContent = nome;
+				return linha;
 			}
 
 			function reconstruirNucleos(nucleos) {
 				rolo.replaceChildren();
 				rolo.dataset.rolar = 'nao';
-				contadores = new Map();
 
 				const juntar = () => {
-					for (const n of nucleos) {
-						const { linha, quantos } = linhaDeNucleo(n);
-						rolo.append(linha);
-
-						const existentes = contadores.get(n.nucleo) ?? [];
-						existentes.push(quantos);
-						contadores.set(n.nucleo, existentes);
-					}
+					for (const nome of nucleos) rolo.append(linhaDeNucleo(nome));
 				};
 
 				juntar();
@@ -314,24 +372,11 @@
 			}
 
 			function desenharNucleos(mural) {
-				conta.replaceChildren();
-				if (mural.total > 0) {
-					const b = document.createElement('b');
-					b.textContent = mural.total;
-					conta.append(b, document.createTextNode(mural.total === 1 ? ' pessoa' : ' pessoas'));
-				}
+				const chave = mural.nucleos.join('|');
+				if (chave === chaveDosNucleos) return;
 
-				const chave = mural.nucleos.map((n) => n.nucleo).join('|');
-				if (chave !== chaveDosNucleos) {
-					chaveDosNucleos = chave;
-					reconstruirNucleos(mural.nucleos);
-					return;
-				}
-
-				// A estrutura não mudou: só os números, no sítio, sem interromper o rolo.
-				for (const n of mural.nucleos) {
-					for (const alvo of contadores.get(n.nucleo) ?? []) alvo.textContent = n.total;
-				}
+				chaveDosNucleos = chave;
+				reconstruirNucleos(mural.nucleos);
 			}
 
 			/* ------------------------------------------------------------- a nuvem */
@@ -342,12 +387,15 @@
 			/*
 			 * **Uma grelha invisível por trás da posição aleatória.**
 			 *
-			 * Aleatório puro amontoa três nomes num canto e deixa metade do ecrã vazio. Escolhe-se
-			 * uma célula livre e desvia-se um pouco dentro dela: a distribuição fica solta sem ficar
-			 * alinhada. Com todas ocupadas, escolhe-se a que está ocupada há mais tempo — a
-			 * sobreposição ocasional é bem-vinda, o amontoado não.
+			 * Aleatório puro amontoa três nomes num canto e deixa metade do ecrã vazio. Escolhe-se uma
+			 * célula livre e desvia-se um pouco dentro dela: a distribuição fica solta sem ficar alinhada.
+			 * Com todas ocupadas, escolhe-se a que está ocupada há mais tempo — a sobreposição ocasional é
+			 * bem-vinda, o amontoado não.
+			 *
+			 * **Cinco colunas e não seis**: os nomes ficaram maiores, e numa célula mais estreita do que o
+			 * nome que lá cabe a vizinhança deixa de ser sobreposição ocasional e passa a ser regra.
 			 */
-			const COLUNAS = 6;
+			const COLUNAS = 5;
 			const LINHAS = 4;
 			const DESVIO = 0.35; // do tamanho da célula, para cada lado
 			const celulas = Array.from({ length: COLUNAS * LINHAS }, () => 0);
@@ -401,13 +449,18 @@
 			 * de meio segundo sustenta dois nomes por segundo, e trezentas pessoas a entrarem em dois
 			 * minutos criam uma fila que só esvazia depois de a sala estar sentada.
 			 *
-			 * O intervalo encurta com o tamanho da fila, entre 500 ms e um chão de 200 ms, por uma
-			 * curva e não por um degrau: `min + (max - min) / (1 + n / suavidade)`. Com a fila vazia
-			 * são 500 ms; com quatro à espera, 350; com vinte, 250; e nunca abaixo de 200. **Não há
-			 * salto visível**, porque a curva é contínua e recalcula-se a cada nome.
+			 * O intervalo encurta com o tamanho da fila, entre 900 ms e um chão de 400 ms, por uma curva e
+			 * não por um degrau: `min + (max - min) / (1 + n / suavidade)`. Com a fila vazia são 900 ms;
+			 * com quatro à espera, 650; com vinte, 483; e nunca abaixo de 400. **Não há salto visível**,
+			 * porque a curva é contínua e recalcula-se a cada nome.
+			 *
+			 * **Os números subiram quando o nome passou a durar nove segundos.** Com os 500 ms de antes
+			 * viviam no ecrã mais de vinte nomes ao mesmo tempo, e vinte nomes grandes em vinte células
+			 * não é uma nuvem, é uma parede. O preço é a fila esvaziar mais devagar, e é o preço certo:
+			 * o que se pediu foi o nome maior e mais tempo no ecrã.
 			 */
-			const INTERVALO_MAX = 500;
-			const INTERVALO_MIN = 200;
+			const INTERVALO_MAX = 900;
+			const INTERVALO_MIN = 400;
 			const SUAVIDADE = 4;
 
 			const fila = [];
@@ -439,9 +492,9 @@
 			/* ------------------------------------------------------------- a sonda */
 
 			/**
-			 * O cursor da janela. **A primeira sonda vai sem ele e não traz nomes** — a nuvem é o que
-			 * está a acontecer, e quem abrir o mural a meio vê as contagens certas sem ver passar quem
-			 * já entrou. Ver `mural.ts`.
+			 * O cursor da janela. **A primeira sonda vai sem ele e não traz nomes** — a nuvem é o que está
+			 * a acontecer, e quem abrir o mural a meio vê os núcleos presentes sem ver passar quem já
+			 * entrou. Ver `mural.ts`.
 			 */
 			let desde = null;
 
