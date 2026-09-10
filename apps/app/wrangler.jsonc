@@ -34,9 +34,10 @@
 	},
 	"observability": { "enabled": true },
 	"upload_source_maps": true,
-	// Ambiente de staging. O `routes` fica aqui dentro e não no topo, apesar de ser chave herdável:
-	// no topo passava a valer para produção, que ainda não tem domínio decidido. O `myrefood.pt` é
-	// staging permanente, não produção. Mesma decisão que está no `wrangler.jsonc` da TV.
+	// Os dois ambientes. O `routes` vive dentro de cada um e não no topo, apesar de ser chave
+	// herdável: no topo um só padrão passava a valer para os dois, e aqui cada ambiente tem o seu
+	// endereço — `app-staging.myrefood.pt` em staging, o apex `myrefood.pt` em produção. É a mesma
+	// decisão que está no `wrangler.jsonc` da TV, onde produção continua sem domínio.
 	//
 	// As chaves não-herdáveis — `d1_databases` e `vars` — têm de ser repetidas aqui.
 	"env": {
@@ -58,6 +59,44 @@
 			"routes": [
 				{
 					"pattern": "app-staging.myrefood.pt",
+					"custom_domain": true,
+				},
+			],
+		},
+		// Produção. Existe como ambiente com nome porque o `deploy:producao` o endereça — e porque
+		// **não há `deploy` solto**: um deploy sem `--env` empurrava a config do topo, que não tem
+		// rotas, para cima do worker de produção.
+		//
+		// A base é a `refood-db`, uuid `1756a0f6…`. Correr sempre o `migrations list` antes de
+		// qualquer `apply` e ler o uuid que ele imprime: o de staging é o `48465336…`.
+		"production": {
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "refood-db",
+					"database_id": "1756a0f6-9464-4257-a6ac-7fee8118dc70",
+					"migrations_dir": "../../migrations",
+				},
+			],
+			// **O Odoo de produção, e é de propósito** — não o de staging. A sala são voluntários
+			// reais, e uma base desactualizada transformava o "ainda não te encontrámos" num terço
+			// das pessoas presentes. As credenciais continuam a ser secrets, nunca aqui.
+			"vars": {
+				"ODOO_URL": "https://erp.onrefood.com",
+				"ODOO_DB": "refood",
+			},
+			// O apex, com `custom_domain` e não com `zone_name`, e a razão é o estado da zona:
+			// **o apex está vazio** — o `myrefood.pt` tem um único registo, o `tv-staging` —, portanto
+			// não há nada com que colidir e o wrangler pode criar o registo e o certificado no deploy.
+			// A escolha não é de gosto: `custom_domain: true` **falha** se já existir registo no apex,
+			// e `zone_name` exige que ele já exista, proxied. Se alguém puser um `A` ou um `CNAME` no
+			// apex antes do primeiro deploy, é este bloco que passa a ter de mudar de forma.
+			//
+			// Com `routes` na configuração, o endereço `workers.dev` fica desligado — mesma coisa que
+			// na TV.
+			"routes": [
+				{
+					"pattern": "myrefood.pt",
 					"custom_domain": true,
 				},
 			],

@@ -161,3 +161,18 @@ The screen shows `refood_logo_horizontal_fundo_escuro.svg`, not the word "Refood
 **This app reads across every núcleo, and it is the second route in the project to do so.** The scope rule says `company_id` comes from the authenticated subject and never from the request — _wherever such a subject exists_. Here none does: the NIF is the input, not a credential, and the question the route asks is exactly _which núcleo is this ficha in?_ So `allowed_company_ids` is the integration user's whole `company_ids`, read from `res.users` and **never from `res.company`** — staging has 87 companies and the user has 84, and asking for one of the other three throws `AccessError` and takes the whole request with it. It fails closed: no user, no list; empty `company_ids`, empty list. See `src/odoo.ts`.
 
 **`POST /api/mural/reiniciar` is a POST because it deletes a table.** A GET that destroys is a GET that a probe, a prefetch or an `<img>` fires on its own. The `/mural` page calls it only when the address carries `?reiniciar`, and then strips the parameter — the plain `/mural` never clears, so a reload mid-session does not wipe the board with the room watching.
+
+## The two environments, and the order the first production deploy runs in
+
+`env.staging` serves `app-staging.myrefood.pt` against the staging Odoo (`refoodteste`); `env.production` serves the **apex `myrefood.pt`** against the **production Odoo** — `https://erp.onrefood.com`, database `refood`. Both are named environments, and there is no top-level route: the top-level config exists only so `wrangler dev` and `d1 migrations` resolve, and deploying it would push a routeless config onto whichever worker was named.
+
+**Production reads the production Odoo, and that is the decision, not an oversight.** The room is real volunteers; an out-of-date staging database would turn _"ainda não te encontrámos"_ into a third of the people present. The cost is written above: this now reads real fichas with a personal account, and the `apps@re-food.org` debt stopped being free that day.
+
+**The apex uses `custom_domain: true` because the apex is empty** — the zone holds one record, `tv-staging` — so the wrangler creates the DNS record and the certificate on the first deploy. The two forms are not interchangeable: `custom_domain` **fails** if a record already exists at the apex, and `zone_name` requires one to exist already, proxied. If anybody adds an `A` or `CNAME` at the apex before the first deploy, that block has to change shape.
+
+The order matters, and each step is the user's to run — **never against production without being asked**:
+
+1. **`0004_presencas_demo` to staging first**, then production only when asked. `list` before every `apply`, reading back the uuid it prints (`48465336…` staging, `1756a0f6…` production). There is no dry run on `apply`, and in a non-interactive shell it auto-answers yes.
+2. **`npm run deploy:producao` before the secrets.** `wrangler secret put` needs the worker to exist. A worker deployed with no secrets is not a broken state: with `ENTRADA_ABERTA` absent the switch is closed, and the closed page is the correct thing to serve on every day but one.
+3. `ODOO_USERNAME` and `ODOO_PASSWORD`, then `ENTRADA_ABERTA=aberta` **on the day only**.
+4. **Afterwards: turn the switch off and empty the table.** `wrangler secret delete ENTRADA_ABERTA` and `DELETE FROM presencas_demo`. That is the whole cleanup, and it is not automatic — the fence in the section above is exactly this step being taken.
