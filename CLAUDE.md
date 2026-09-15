@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 npm workspaces monorepo: deployable apps in `apps/*`, shared libraries in `packages/*`. Dependencies install from the **root** (`npm install`); there is a single root `package-lock.json` and no nested lockfiles.
 
+- `apps/app` — Cloudflare Worker `refood-app`, the volunteer PWA. **Has its own `CLAUDE.md`**; read it before touching anything under `apps/app` — today the app is a demo, and that file says what of it is disposable.
 - `apps/tv` — Cloudflare Worker `refood-tv`, the dashboard screens in each núcleo. **Has its own `CLAUDE.md`** with the app's authorization and data rules; read it before touching anything under `apps/tv`.
 - `packages/odoo` — `@refood/odoo`, the Odoo JSON-RPC client shared by the apps.
 - `docs/` — `arquitetura.md` (architecture and decisions) and `modelos-odoo.md`, the index of the Odoo database survey. The models themselves are documented per area under `docs/modelos/`; read the index before querying a model you haven't seen, and add to it when you survey a new one. Structure only — these documents never carry record data.
@@ -101,6 +102,7 @@ Facts about the protocol that the code encodes, and that any change must preserv
 
 - User-facing strings, code comments, and commit messages are in Portuguese (pt-PT); code identifiers are English. Match this when adding responses, comments, or commits.
 - The team's shorthand, which shows up in requests: **VL** = voluntários (`hr.employee`), **BF** = beneficiários (`res.beneficiary`), **FA** = fontes de alimentos (`res.food.source`), **PA** = parceiros de apoio (`res.support.partner`), **núcleos** = the Odoo companies (`res.company`). The full table, and the two that mislead — a volunteer is an _employee_, not a user; a núcleo is a _company_ — are in `docs/modelos-odoo.md`.
+- **Naming the app is how a request gets situated.** **TV** (or _o televisor_, _os ecrãs_) = `apps/tv`; **PWA** (or _a app_, _a app dos voluntários_) = `apps/app`. Both have their own `CLAUDE.md`. Infer the app only when something named exists in only one of them. Do not infer from subject matter: turnos, voluntários and núcleos live in both, and a request about them situates nothing. Ask.
 - Secrets never go in `wrangler.jsonc` — its `vars` are public build-time values baked into the generated types. Use `.dev.vars` locally and `wrangler secret put` for deployed environments.
 
 # Instruções de projeto — Refood

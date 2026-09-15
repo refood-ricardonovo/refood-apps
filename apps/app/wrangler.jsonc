@@ -78,9 +78,11 @@
 					"migrations_dir": "../../migrations",
 				},
 			],
-			// **O Odoo de produção, e é de propósito** — não o de staging. A sala são voluntários
-			// reais, e uma base desactualizada transformava o "ainda não te encontrámos" num terço
-			// das pessoas presentes. As credenciais continuam a ser secrets, nunca aqui.
+			// **Aponta ao Odoo de produção só no dia da apresentação, e volta a staging a seguir** —
+			// a par do interruptor `ENTRADA_ABERTA` e do esvaziar da `presencas_demo`, que são o
+			// mesmo acto e não três coisas separadas. Não é propriedade deste ambiente: em repouso
+			// lê staging, como a TV. A razão por extenso está no `CLAUDE.md` desta app, na secção
+			// dos dois ambientes. As credenciais continuam a ser secrets, nunca aqui.
 			//
 			// **A base chama-se `refood.flybyodoo.pt`** — o nome tem pontos e parece um domínio, e não
 			// é o `refood` que se adivinha a partir do URL. Adivinhá-lo custou uma noite: um nome de
