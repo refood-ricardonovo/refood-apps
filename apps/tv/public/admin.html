@@ -690,18 +690,7 @@
 				 * momento em que alguém sabe que aquele é o da cozinha. Continuam editáveis na lista de
 				 * ecrãs — isto é o ponto de partida, não a única oportunidade.
 				 */
-				const painel = document.createElement('select');
-				painel.setAttribute('aria-label', `Painel inicial para o código ${pendente.codigo}`);
-				const porOmissaoOpcao = document.createElement('option');
-				porOmissaoOpcao.value = '';
-				porOmissaoOpcao.textContent = painelPorOmissao ? `Abre em ${painelPorOmissao}` : 'Painel por omissão';
-				painel.append(porOmissaoOpcao);
-				for (const nome of paineisDisponiveis) {
-					const opcao = document.createElement('option');
-					opcao.value = nome;
-					opcao.textContent = `Abre em ${nome}`;
-					painel.append(opcao);
-				}
+				const painel = dropdownDePaineis(null, `Painel inicial para o código ${pendente.codigo}`);
 
 				const local = document.createElement('input');
 				local.type = 'text';
@@ -882,6 +871,52 @@
 			const MAX_LOCAL = 30;
 
 			/**
+			 * O dropdown de painéis. **Um só, para os dois sítios onde aparece.**
+			 *
+			 * Estava escrito duas vezes — na aprovação de um pendente e na edição de um ecrã — e as duas
+			 * divergiram à primeira oportunidade: na aprovação, a opção vazia dizia "Abre em entregas",
+			 * igualzinha à opção concreta logo a seguir. Duas linhas com o mesmo texto e significados
+			 * diferentes, uma por cima da outra.
+			 *
+			 * **A distinção que os rótulos têm de carregar** é entre *não escolher* e *escolher*: sem
+			 * escolha, o ecrã segue o painel por omissão e acompanha-o se ele mudar; com escolha, fica
+			 * preso àquele. Daí a assimetria — a vazia diz "Por omissão", as outras dizem "Abre em".
+			 *
+			 * `valorActual` a `null` é o caso da aprovação, onde ainda não há nada guardado.
+			 */
+			function dropdownDePaineis(valorActual, etiquetaAria) {
+				const escolha = document.createElement('select');
+				escolha.setAttribute('aria-label', etiquetaAria);
+
+				const porOmissao = document.createElement('option');
+				porOmissao.value = '';
+				porOmissao.textContent = painelPorOmissao ? `Por omissão (${painelPorOmissao})` : 'Por omissão';
+				escolha.append(porOmissao);
+
+				for (const nome of paineisDisponiveis) {
+					const opcao = document.createElement('option');
+					opcao.value = nome;
+					opcao.textContent = `Abre em ${nome}`;
+					escolha.append(opcao);
+				}
+
+				/*
+				 * Um painel guardado que esta versão da página não conheça não pode desaparecer do
+				 * dropdown em silêncio: quem gravasse a seguir estaria a apagá-lo sem saber. Entra como
+				 * opção própria, marcada.
+				 */
+				if (valorActual && !paineisDisponiveis.includes(valorActual)) {
+					const desconhecido = document.createElement('option');
+					desconhecido.value = valorActual;
+					desconhecido.textContent = `${valorActual} (desconhecido)`;
+					escolha.append(desconhecido);
+				}
+
+				escolha.value = valorActual ?? '';
+				return escolha;
+			}
+
+			/**
 			 * Os painéis que o servidor aceita, e qual deles é o por omissão.
 			 *
 			 * **Vêm com a listagem dos dispositivos, e não escritos aqui.** É a mesma regra do dropdown
@@ -927,7 +962,7 @@
 			 * do zero — forçado, porque o editor acabou de se fechar mas o `alguemAMexer` só sabe
 			 * disso depois de o `editorAberto` voltar a `null`.
 			 */
-			function abrirEditor(cartao, dispositivo, paineis, porOmissao, dispositivos) {
+			function abrirEditor(cartao, dispositivo, dispositivos) {
 				if (editorAberto !== null) return;
 				editorAberto = { id: dispositivo.id };
 
@@ -935,29 +970,7 @@
 				const anteriores = [...controlos.children];
 				for (const filho of anteriores) filho.remove();
 
-				const escolha = document.createElement('select');
-				const nenhum = document.createElement('option');
-				nenhum.value = '';
-				nenhum.textContent = porOmissao ? `Por omissão (${porOmissao})` : 'Por omissão';
-				escolha.append(nenhum);
-				for (const painel of paineis) {
-					const opcao = document.createElement('option');
-					opcao.value = painel;
-					opcao.textContent = painel;
-					escolha.append(opcao);
-				}
-				/*
-				 * Um painel guardado que esta versão da página não conheça não pode desaparecer do
-				 * dropdown em silêncio: quem gravasse a seguir estaria a apagá-lo sem saber. Entra como
-				 * opção própria, marcada.
-				 */
-				if (dispositivo.painel_inicial && !paineis.includes(dispositivo.painel_inicial)) {
-					const desconhecido = document.createElement('option');
-					desconhecido.value = dispositivo.painel_inicial;
-					desconhecido.textContent = `${dispositivo.painel_inicial} (desconhecido)`;
-					escolha.append(desconhecido);
-				}
-				escolha.value = dispositivo.painel_inicial ?? '';
+				const escolha = dropdownDePaineis(dispositivo.painel_inicial, `Painel inicial do ecrã ${dispositivo.ordinal}`);
 
 				const campo = document.createElement('input');
 				campo.type = 'text';
@@ -1042,9 +1055,6 @@
 
 			function desenharDispositivos(resposta, lista) {
 				const dispositivos = resposta.dispositivos ?? [];
-				// A lista de painéis vem do servidor — a mesma que ele aceita ao guardar. Ver a rota.
-				const paineis = resposta.paineis ?? [];
-				const porOmissao = resposta.painel_por_omissao ?? null;
 
 				ultimosDispositivos = resposta;
 				ultimaListaDeNucleos = lista;
@@ -1122,7 +1132,7 @@
 
 					const meta = document.createElement('div');
 					meta.className = 'meta';
-					const painelDito = dispositivo.painel_inicial ?? (porOmissao ? `${porOmissao} (por omissão)` : 'por omissão');
+					const painelDito = dispositivo.painel_inicial ?? (painelPorOmissao ? `${painelPorOmissao} (por omissão)` : 'por omissão');
 					meta.textContent =
 						`abre em: ${painelDito} · visto: ${desde(dispositivo.visto_em)}` +
 						(dispositivo.versao ? ` · versão ${dispositivo.versao}` : '');
@@ -1141,7 +1151,7 @@
 					} else {
 						const editar = document.createElement('button');
 						editar.textContent = 'Editar';
-						editar.addEventListener('click', () => abrirEditor(cartao, dispositivo, paineis, porOmissao, dispositivos));
+						editar.addEventListener('click', () => abrirEditor(cartao, dispositivo, dispositivos));
 						controlos.append(editar);
 
 						const revogar = document.createElement('button');
