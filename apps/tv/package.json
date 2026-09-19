@@ -3,7 +3,9 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"deploy": "wrangler deploy",
+		"deploy": "node -e \"console.error('Sem ambiente nao ha deploy. Usa: npm run deploy:staging --workspace=tv  ou  npm run deploy:producao --workspace=tv'); process.exit(1)\"",
+		"deploy:staging": "wrangler deploy --env staging",
+		"deploy:producao": "wrangler deploy",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"cf-typegen": "wrangler types",

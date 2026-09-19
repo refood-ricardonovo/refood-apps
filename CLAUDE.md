@@ -42,7 +42,8 @@ npm run typecheck                        # all workspaces
 npm test --workspace=@refood/odoo        # one workspace; add -- -t 'nome' to filter
 npm run test:watch --workspace=@refood/odoo
 npm run dev      --workspace=tv          # wrangler dev
-npm run deploy   --workspace=tv          # wrangler deploy
+npm run deploy:staging  --workspace=tv   # wrangler deploy --env staging
+npm run deploy:producao --workspace=tv   # produção. Não há `deploy` sem ambiente, de propósito
 npm run cf-typegen --workspace=tv        # wrangler types — regenerates worker-configuration.d.ts
 
 node --experimental-strip-types scripts/explorar.ts <modelo>   # inspect a model's fields + a sample
