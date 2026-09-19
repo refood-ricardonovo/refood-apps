@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="pt-PT">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Refood — diagnóstico do ecrã</title>
+		<link rel="icon" href="/img/favicon.ico" sizes="any" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<style>
+			/*
+			 * Página de diagnóstico do televisor. Abre-se uma vez, num núcleo, antes de comprar mais
+			 * ecrãs — e responde às duas perguntas que nenhuma medição feita no computador resolve:
+			 *
+			 * 1. **Que largura reporta o browser?** É `innerWidth` em píxeis CSS que decide a grelha
+			 *    do painel, não as polegadas nem a resolução do painel LCD. Um 4K pode reportar 3840
+			 *    (e o texto fica com metade do tamanho aparente) ou 1920 com `devicePixelRatio: 2`
+			 *    (e é igual a um 1080p, só que nítido). Não é previsível: depende da box e do browser.
+			 * 2. **Há overscan?** Alguns televisores cortam 2 a 5% à volta da imagem, em hardware,
+			 *    antes de o CSS ter uma palavra a dizer. A 1920, 3% são 58px de cada lado — mais do
+			 *    que basta para levar a última coluna de cartões, sem que nada no código o explique.
+			 *
+			 * **Isto é um ficheiro estático e tem de continuar a ser.** Não faz `fetch`, não tem rota
+			 * no Worker, não lê o D1 nem o Odoo, e não sabe a que núcleo o ecrã pertence — o que
+			 * mostra é o browser a falar de si próprio, e por isso pode ser público como o `index.html`
+			 * ao lado. **A secção "Diagnostics" do `CLAUDE.md` desta app é a razão de ser desta cerca:**
+			 * o `/api/teste` foi-se por ler `res.users` sem âmbito nenhum, e o `/api/version` passou
+			 * para trás do segredo do admin porque a versão do servidor de outra pessoa não é conversa
+			 * para quem passa. Esta página não segue esse caminho porque não tem por onde. Se alguma
+			 * vez precisar de um dado do servidor, isso quer dizer que passou a ser outra coisa — e
+			 * essa outra coisa leva autenticação, como qualquer rota que sirva dados.
+			 *
+			 * Serve-se em `/diagnostico.html`, público como o resto de `public/`. Pode apagar-se assim
+			 * que os televisores estiverem escolhidos: não há nada no painel que dependa dele.
+			 */
+
+			* {
+				box-sizing: border-box;
+				margin: 0;
+			}
+
+			/*
+			 * **Tudo em proporção da largura, e é de propósito.**
+			 *
+			 * Esta página tem de se ler num 1080p e num 4K que reporte 3840, e é justamente o que
+			 * está em causa. Em píxeis fixos ficava ilegível no segundo — que é o defeito que ela
+			 * existe para detectar. Aqui a unidade é `--u`, um milésimo da largura da janela.
+			 */
+			:root {
+				--u: 0.1vw;
+			}
+
+			body {
+				background: var(--n-950);
+				color: var(--n-000);
+				font-family: var(--fonte);
+				font-weight: 500;
+				font-variant-numeric: tabular-nums;
+				line-height: 1.25;
+				min-height: 100vh;
+				overflow-x: hidden;
+				/*
+				 * A margem de baixo é maior do que as outras de propósito: a régua de baixo é fixa e
+				 * assentava em cima da tabela. O espaço é para ela.
+				 */
+				padding: calc(var(--u) * 45) calc(var(--u) * 45) calc(var(--u) * 100);
+				font-size: calc(var(--u) * 11);
+			}
+
+			/*
+			 * ------------------------------------------------------------------ overscan
+			 *
+			 * A moldura encosta-se às quatro bordas da janela. **Se não se vir inteira, há overscan** —
+			 * e as réguas dizem quanto: lê-se a primeira marca visível de cada canto.
+			 *
+			 * `position: fixed` e não `absolute`: o que interessa é a borda da *janela*, não a do
+			 * documento, que pode ser mais alta.
+			 */
+			.moldura {
+				position: fixed;
+				inset: 0;
+				border: calc(var(--u) * 3) solid var(--marca-amarelo);
+				pointer-events: none;
+				z-index: 10;
+			}
+
+			/* Os cantos, em L, para se verem mesmo se um lado inteiro estiver cortado. */
+			.canto {
+				position: fixed;
+				width: calc(var(--u) * 60);
+				height: calc(var(--u) * 60);
+				border: calc(var(--u) * 6) solid var(--ok-claro);
+				pointer-events: none;
+				z-index: 11;
+			}
+			.canto[data-canto='ne'],
+			.canto[data-canto='no'] {
+				top: 0;
+				border-bottom: none;
+			}
+			.canto[data-canto='se'],
+			.canto[data-canto='so'] {
+				bottom: 0;
+				border-top: none;
+			}
+			.canto[data-canto='no'],
+			.canto[data-canto='so'] {
+				left: 0;
+				border-right: none;
+			}
+			.canto[data-canto='ne'],
+			.canto[data-canto='se'] {
+				right: 0;
+				border-left: none;
+			}
+
+			/*
+			 * **As marcas contam a partir da borda, não do centro** — é a distância à borda que é a
+			 * medida do overscan. Numa régua de cima, cada marca é uma barra horizontal a 10, 20,
+			 * 30… px do topo; numa das laterais, uma barra vertical a 10, 20, 30… px da lateral.
+			 *
+			 * Em píxeis CSS fixos e não em `--u`: aqui o que se quer é a distância real, a mesma
+			 * unidade em que se lê `innerWidth`. Uma régua que escalasse com a janela não media nada.
+			 */
+			.regua {
+				position: fixed;
+				pointer-events: none;
+				z-index: 11;
+				font-size: 13px;
+				font-weight: var(--peso-enfase);
+				color: var(--n-200);
+			}
+			.regua[data-lado='cima'],
+			.regua[data-lado='baixo'] {
+				left: 50%;
+				transform: translateX(-50%);
+				width: 190px;
+				height: 100px;
+			}
+			.regua[data-lado='esquerda'],
+			.regua[data-lado='direita'] {
+				top: 50%;
+				transform: translateY(-50%);
+				width: 100px;
+				height: 190px;
+			}
+			.regua[data-lado='cima'] {
+				top: 0;
+			}
+			.regua[data-lado='baixo'] {
+				bottom: 0;
+			}
+			.regua[data-lado='esquerda'] {
+				left: 0;
+			}
+			.regua[data-lado='direita'] {
+				right: 0;
+			}
+
+			.marca-regua {
+				position: absolute;
+				background: var(--n-200);
+			}
+			/* Numa régua de cima/baixo a marca é uma barra deitada; numa lateral, ao alto. */
+			.regua[data-lado='cima'] .marca-regua,
+			.regua[data-lado='baixo'] .marca-regua {
+				height: 2px;
+				left: 0;
+			}
+			.regua[data-lado='esquerda'] .marca-regua,
+			.regua[data-lado='direita'] .marca-regua {
+				width: 2px;
+				top: 0;
+			}
+
+			.rotulo-regua {
+				position: absolute;
+				white-space: nowrap;
+				background: var(--n-950);
+				padding: 0 3px;
+			}
+
+			/* ------------------------------------------------------------------ conteúdo */
+
+			main {
+				position: relative;
+				z-index: 1;
+				max-width: calc(var(--u) * 900);
+				margin: 0 auto;
+				display: grid;
+				gap: calc(var(--u) * 22);
+			}
+
+			h1 {
+				font-size: calc(var(--u) * 26);
+				font-weight: var(--peso-destaque);
+				color: var(--marca-amarelo);
+				line-height: 1.1;
+			}
+
+			h1 small {
+				display: block;
+				font-size: calc(var(--u) * 11);
+				font-weight: var(--peso-corrente);
+				color: var(--n-400);
+				margin-top: calc(var(--u) * 6);
+			}
+
+			h2 {
+				font-size: calc(var(--u) * 14);
+				font-weight: var(--peso-enfase);
+				color: var(--n-200);
+				margin-bottom: calc(var(--u) * 8);
+			}
+
+			/* Os números que interessam, em grande: lêem-se de pé, do outro lado da cozinha. */
+			.numeros {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(calc(var(--u) * 200), 1fr));
+				gap: calc(var(--u) * 14);
+			}
+
+			.caixa {
+				border: calc(var(--u) * 2) solid var(--n-800);
+				border-left-width: calc(var(--u) * 8);
+				border-radius: calc(var(--u) * 6);
+				padding: calc(var(--u) * 12) calc(var(--u) * 14);
+				background: var(--n-900);
+			}
+
+			.caixa dt {
+				font-size: calc(var(--u) * 10);
+				color: var(--n-400);
+				font-weight: var(--peso-corrente);
+			}
+
+			.caixa dd {
+				font-size: calc(var(--u) * 30);
+				font-weight: var(--peso-destaque);
+				line-height: 1.05;
+				margin-top: calc(var(--u) * 4);
+			}
+
+			.caixa dd small {
+				font-size: calc(var(--u) * 10);
+				font-weight: var(--peso-corrente);
+				color: var(--n-400);
+				margin-left: calc(var(--u) * 4);
+			}
+
+			.caixa[data-destaque='sim'] {
+				border-color: var(--marca-amarelo);
+			}
+			.caixa[data-destaque='sim'] dd {
+				color: var(--marca-amarelo);
+			}
+
+			/* O veredicto, em texto corrido: é o que a pessoa vai escrever no relatório. */
+			.veredicto {
+				border: calc(var(--u) * 2) solid var(--n-800);
+				border-radius: calc(var(--u) * 6);
+				padding: calc(var(--u) * 14);
+				background: var(--n-900);
+				font-size: calc(var(--u) * 12);
+			}
+
+			.veredicto p + p {
+				margin-top: calc(var(--u) * 8);
+			}
+
+			.veredicto b {
+				font-weight: var(--peso-destaque);
+			}
+
+			.bom {
+				color: var(--ok-claro);
+			}
+			.mau {
+				color: var(--erro-claro);
+			}
+			.aviso {
+				color: var(--marca-amarelo);
+			}
+
+			.nota {
+				font-size: calc(var(--u) * 9);
+				color: var(--n-400);
+				line-height: 1.4;
+			}
+
+			.ua {
+				font-size: calc(var(--u) * 8);
+				color: var(--n-600);
+				word-break: break-all;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="moldura"></div>
+		<div class="canto" data-canto="no"></div>
+		<div class="canto" data-canto="ne"></div>
+		<div class="canto" data-canto="so"></div>
+		<div class="canto" data-canto="se"></div>
+		<div class="regua" data-lado="cima"></div>
+		<div class="regua" data-lado="baixo"></div>
+		<div class="regua" data-lado="esquerda"></div>
+		<div class="regua" data-lado="direita"></div>
+
+		<main>
+			<h1>
+				Diagnóstico do ecrã
+				<small>Página estática. Não lê dados, não sabe de que núcleo é este ecrã, e não fala com o servidor.</small>
+			</h1>
+
+			<section>
+				<h2>O que o browser reporta</h2>
+				<dl class="numeros" id="numeros"></dl>
+			</section>
+
+			<section>
+				<h2>Veredicto</h2>
+				<div class="veredicto" id="veredicto"></div>
+			</section>
+
+			<section>
+				<h2>O painel, a esta largura</h2>
+				<div class="veredicto" id="proporcao"></div>
+			</section>
+
+			<section>
+				<h2>Overscan</h2>
+				<div class="veredicto">
+					<p>
+						A <b class="aviso">moldura amarela</b> está encostada às quatro bordas da janela, e os <b class="bom">cantos verdes</b> estão
+						nos quatro cantos.
+					</p>
+					<p>
+						<b>Se vês a moldura inteira e os quatro cantos, não há overscan</b> e o televisor mostra a imagem toda. Se algum lado
+						desaparecer, o televisor está a cortar — e as réguas dizem quanto: lê a primeira marca numerada que consegues ver de cada lado.
+					</p>
+				</div>
+			</section>
+
+			<p class="ua" id="ua"></p>
+		</main>
+
+		<script>
+			/*
+			 * ------------------------------------------------------------------ os degraus
+			 *
+			 * **Aqui já não há degraus nenhuns, e é essa a notícia.**
+			 *
+			 * Esta página teve, por pouco tempo, uma cópia dos degraus do painel e duas tabelas a
+			 * dizer quantos cartões se perdiam nesta largura. Fazia sentido enquanto o painel estava
+			 * escrito em píxeis absolutos: a resposta dependia mesmo do que o televisor reportasse, e
+			 * a 960 perdiam-se quatro em cada cinco cartões.
+			 *
+			 * Deixou de fazer. O painel passou a estar escrito em `--px`, uma fracção do ecrã, e o
+			 * resultado no vidro é o mesmo venha a janela com 960, 1920 ou 3840 — **a largura
+			 * reportada deixou de ser uma pergunta sobre o painel.** Uma tabela aqui só podia dizer
+			 * sempre a mesma coisa, e a cópia dos números só podia envelhecer.
+			 *
+			 * Quem quiser a verificação tem-na onde ela pode ser feita a sério, com o painel carregado
+			 * num browser e os cartões medidos: `apps/tv/test/degraus.test.ts`.
+			 *
+			 * **O que esta página continua a responder é o que nenhum teste responde:** o que este
+			 * aparelho reporta, e se corta a imagem nas bordas.
+			 */
+			/**
+			 * O que esta largura significa para o painel — que hoje é: nada de especial.
+			 *
+			 * O `--px` do painel vale `min(100vw / 1920, 100vh / 1080)`, e é essa a conta que se
+			 * repete aqui para se poder dizer o número em voz alta.
+			 */
+			function desenharProporcao(largura, altura, dpr) {
+				const escala = Math.min(largura / 1920, altura / 1080);
+				const alvo = document.getElementById('proporcao');
+				alvo.replaceChildren();
+
+				alvo.append(
+					p([
+						document.createTextNode('O painel desenha-se em fracções do ecrã, não em píxeis. Nesta janela 1 px do desenho vale '),
+						forte(escala.toFixed(3).replace('.', ',') + ' px CSS'),
+						document.createTextNode(dpr === 1 ? '.' : ', e portanto ' + (escala * dpr).toFixed(2).replace('.', ',') + ' píxeis do painel.'),
+					]),
+					p([
+						forte('A grelha é a mesma em qualquer largura.', 'bom'),
+						document.createTextNode(
+							' Os degraus, as colunas e as linhas não dependem do que este aparelho reporta: no degrau mais denso são 8 colunas por ' +
+								'9 linhas nas entregas e 5 por 6 nas recolhas, aqui como num 1080p como num 4K. O que muda é o tamanho de cada coisa, e muda tudo junto.',
+						),
+					]),
+					p([
+						document.createTextNode('Quem quiser a verificação dos degraus — tectos, colunas e lugares — encontra-a no '),
+						forte('apps/tv/test/degraus.test.ts'),
+						document.createTextNode(
+							', que carrega o painel num browser e mede os cartões. Aqui não há cópia desses números para envelhecer.',
+						),
+					]),
+					p([
+						document.createTextNode(
+							'Para ver os cartões de cada degrau neste televisor, em tamanho real e sem precisar de um turno grande: ',
+						),
+						ligacao('/diagnostico-degraus.html', 'amostra dos degraus'),
+						document.createTextNode('.'),
+					]),
+				);
+			}
+
+			/** Uma ligação para uma das páginas irmãs. */
+			function ligacao(destino, texto) {
+				const a = document.createElement('a');
+				a.href = destino;
+				a.textContent = texto;
+				return a;
+			}
+
+			function caixa(rotulo, valor, unidade, destaque) {
+				const d = document.createElement('div');
+				d.className = 'caixa';
+				if (destaque) d.dataset.destaque = 'sim';
+
+				const dt = document.createElement('dt');
+				dt.textContent = rotulo;
+
+				const dd = document.createElement('dd');
+				dd.textContent = valor;
+				if (unidade) {
+					const s = document.createElement('small');
+					s.textContent = unidade;
+					dd.append(s);
+				}
+
+				d.append(dt, dd);
+				return d;
+			}
+
+			function p(html) {
+				const el = document.createElement('p');
+				el.append(...html);
+				return el;
+			}
+
+			function forte(texto, classe) {
+				const b = document.createElement('b');
+				b.textContent = texto;
+				if (classe) b.className = classe;
+				return b;
+			}
+
+			/*
+			 * As marcas, de 10 em 10 píxeis CSS **a contar da borda**, numeradas todas.
+			 *
+			 * `borda` é a propriedade que as afasta da borda daquele lado — `top` numa régua de cima,
+			 * `right` numa da direita —, e é ela que faz a marca de "30" estar a 30px da borda.
+			 * `atravessa` é a outra, e só espalha as marcas para não ficarem em cima umas das outras.
+			 */
+			const LADOS = {
+				cima: { borda: 'top', atravessa: 'left' },
+				baixo: { borda: 'bottom', atravessa: 'left' },
+				esquerda: { borda: 'left', atravessa: 'top' },
+				direita: { borda: 'right', atravessa: 'top' },
+			};
+
+			function desenharReguas() {
+				for (const regua of document.querySelectorAll('.regua')) {
+					const eixo = LADOS[regua.dataset.lado];
+					const horizontal = eixo.atravessa === 'left';
+					regua.replaceChildren();
+
+					for (let d = 10; d <= 60; d += 10) {
+						const m = document.createElement('div');
+						m.className = 'marca-regua';
+						m.style[eixo.borda] = d + 'px';
+						m.style[eixo.atravessa] = '0';
+						/* A barra cresce com a distância: vê-se de relance qual é a mais funda. */
+						if (horizontal) m.style.width = 40 + d + 'px';
+						else m.style.height = 40 + d + 'px';
+						/* As de 20 em 20 são as numeradas, e destacam-se para se contar por elas. */
+						if (d % 20 === 0) m.style.background = 'var(--marca-amarelo)';
+						regua.append(m);
+
+						/*
+						 * **Só se numera de 20 em 20.** A 13px de letra e marcas de 10 em 10, os
+						 * rótulos montavam-se uns nos outros e nenhum se lia — que é o contrário do
+						 * que uma régua serve para fazer. As marcas continuam todas lá para contar.
+						 */
+						if (d % 20 !== 0) continue;
+						const r = document.createElement('div');
+						r.className = 'rotulo-regua';
+						r.textContent = d;
+						r.style[eixo.borda] = d - 9 + 'px';
+						r.style[eixo.atravessa] = 46 + d + 'px';
+						regua.append(r);
+					}
+				}
+			}
+
+			/** Uma célula de tabela, com a classe de alinhamento e, se for caso disso, a cor do juízo. */
+			function medir() {
+				const l = window.innerWidth;
+				const a = window.innerHeight;
+				const dpr = window.devicePixelRatio || 1;
+				const escala = window.visualViewport ? window.visualViewport.scale : 1;
+
+				/* ---------------------------------------------------------------- números */
+				const numeros = document.getElementById('numeros');
+				numeros.replaceChildren(
+					caixa('Janela — é este número que decide a grelha', l + ' × ' + a, 'px CSS', true),
+					caixa('devicePixelRatio', dpr.toString(), dpr === 1 ? '' : '×'),
+					caixa('Píxeis reais no painel', Math.round(l * dpr) + ' × ' + Math.round(a * dpr), 'px'),
+					caixa('screen', screen.width + ' × ' + screen.height, 'px'),
+					caixa('Zoom da página', Math.round(escala * 100) + '%', escala === 1 ? '' : 'não é 100%'),
+				);
+
+				/* -------------------------------------------------------------- veredicto */
+				const v = document.getElementById('veredicto');
+				v.replaceChildren();
+
+				if (Math.abs(escala - 1) > 0.01) {
+					v.append(
+						p([
+							forte('Atenção: esta página não está a 100%. ', 'mau'),
+							document.createTextNode(
+								'Está a ' + Math.round(escala * 100) + '%, o que falseia tudo o que está aqui. Põe o zoom a 100% e recarrega.',
+							),
+						]),
+					);
+				}
+
+				/*
+				 * **O veredicto mudou de assunto, e a mudança é o resumo do que se aprendeu aqui.**
+				 *
+				 * Enquanto o painel estava escrito em píxeis absolutos, a pergunta era a largura em
+				 * píxeis CSS: abaixo de 1800 cortava cartões, acima ficava bem. Já não é. O painel
+				 * está em `--px` e enche a janela que houver, portanto o número CSS deixou de dizer
+				 * o que quer que seja sobre o painel — **diz sobre o aparelho, e é só o que se lê
+				 * aqui agora.**
+				 *
+				 * O que resta a perguntar é quantos píxeis o ecrã tem mesmo, que é `innerWidth` vezes
+				 * o `devicePixelRatio`. Isso decide a nitidez e nada mais.
+				 */
+				const fisicos = Math.round(l * dpr);
+
+				if (fisicos >= 1800) {
+					v.append(
+						p([
+							forte('Este ecrã serve. ', 'bom'),
+							document.createTextNode(
+								'São ' +
+									fisicos +
+									' × ' +
+									Math.round(a * dpr) +
+									' píxeis reais, 1080p ou melhor, e o painel ocupa-os todos: está escrito em fracções do ecrã e não em píxeis, portanto adapta-se à janela em vez de contar com uma.',
+							),
+						]),
+					);
+				} else {
+					v.append(
+						p([
+							forte('Poucos píxeis: ' + fisicos + ' na horizontal. ', 'mau'),
+							document.createTextNode(
+								'O painel adapta-se e mostra a grelha toda, mas a letra fica pequena em absoluto e a três metros isso nota-se. Aqui não há truque de escala que resolva — é mesmo pouco ecrã.',
+							),
+						]),
+					);
+				}
+
+				if (dpr >= 1.5) {
+					v.append(
+						p([
+							document.createTextNode('A janela reporta ' + l + ' × ' + a + ' px CSS com um '),
+							forte('devicePixelRatio de ' + dpr),
+							document.createTextNode(
+								'. É a densidade normal de uma Android TV — 1 px CSS = 1 dp = ' +
+									dpr +
+									' px do painel — e não é defeito nem overscan. Houve tempo em que era um problema, porque o painel assumia 1920 px CSS; deixou de ser.',
+							),
+						]),
+					);
+				}
+
+				/* ---------------------------------------------------------------- tabelas */
+				desenharProporcao(l, a, dpr);
+
+				document.getElementById('ua').textContent = navigator.userAgent;
+				desenharReguas();
+			}
+
+			medir();
+			window.addEventListener('resize', medir);
+		</script>
+	</body>
+</html>

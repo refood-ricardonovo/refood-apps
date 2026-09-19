@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="pt-PT">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Refood — amostra dos degraus</title>
+		<link rel="icon" href="/img/favicon.ico" sizes="any" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<style id="estilo-da-pagina">
+			/*
+			 * Amostra dos degraus do painel de entregas, em tamanho real, num televisor.
+			 *
+			 * **Para que serve.** Decidir quantas colunas deve ter cada degrau é uma decisão que não
+			 * se toma num monitor a 60cm: a três ou oito metros, um cartão mais pequeno com mais
+			 * colunas pode ser pior do que um cartão maior com menos, e nenhuma medida em píxeis
+			 * responde a isso. Faltava poder ver os degraus `normal` e `apertada` num ecrã — e não há
+			 * núcleos com 31 a 63 famílias à mão para os fazer aparecer.
+			 *
+			 * Cada degrau leva **duas variantes, que diferem só na etiqueta**: quatro caracteres
+			 * (`B912`) e cinco (`B1047`). É o único eixo que muda, para se ver exactamente o que custa
+			 * acomodar um núcleo cuja numeração passou dos mil — já há 47 cartões assim na base, e o
+			 * maior contador vai em 1574.
+			 *
+			 * ---------------------------------------------------------------------------------
+			 *
+			 * **Isto não copia o painel: carrega-o.**
+			 *
+			 * A página vai buscar o `painel.html`, injecta o `<style>` dele e chama o
+			 * `cartaoDeEntrega()` dele para construir cada cartão. Os degraus, as colunas e os cortes
+			 * de contagem são lidos do CSS e da função `densidade()` — nada aqui é um número escrito à
+			 * mão. Uma amostra que fosse uma réplica mostrava um cartão que não existe, que é
+			 * precisamente o erro que estas verificações todas existem para não repetir.
+			 *
+			 * **O `fetch` ao `painel.html` não fura a cerca dos diagnósticos.** O que a secção
+			 * "Diagnostics" do `CLAUDE.md` desta app proíbe é uma página aberta ir buscar **dados** ao
+			 * servidor — foi por isso que o `/api/teste` desapareceu e o `/api/version` foi para trás
+			 * do segredo do admin. Aqui lê-se um ficheiro estático de `public/`, servido pelo binding
+			 * de assets antes de o Worker sequer ser chamado, tão público como esta própria página.
+			 * Não há rota, não há token, não há D1 e não há Odoo. O painel é que precisa de token para
+			 * os **dados**; o HTML dele não.
+			 *
+			 * Descartável como as irmãs: apaga-se quando as colunas estiverem decididas.
+			 */
+
+			/*
+			 * **O tamanho é o do painel, e é essa a razão de ser da página.**
+			 *
+			 * O `--px` vem do `painel.html` quando o `<style>` dele é injectado — `min(100vw / 1920,
+			 * 100vh / 1080)` —, portanto um cartão aqui ocupa no vidro exactamente os píxeis que
+			 * ocuparia lá. Este valor é só o que vale antes de o painel chegar, para a página não
+			 * piscar sem medidas.
+			 */
+			:root {
+				--px: min(calc(100vw / 1920), calc(100vh / 1080));
+			}
+
+			body {
+				background: var(--n-950);
+				color: var(--n-000);
+				font-family: var(--fonte);
+				font-weight: 500;
+				font-variant-numeric: tabular-nums;
+				line-height: 1.2;
+				margin: 0;
+				padding: calc(24 * var(--px));
+				min-height: 100vh;
+				display: grid;
+				grid-template-rows: auto 1fr;
+				gap: calc(16 * var(--px));
+			}
+
+			h1 {
+				font-size: calc(30 * var(--px));
+				font-weight: var(--peso-destaque);
+				color: var(--marca-amarelo);
+				margin: 0;
+			}
+
+			h1 small {
+				display: block;
+				font-size: calc(15 * var(--px));
+				font-weight: var(--peso-corrente);
+				color: var(--n-400);
+				margin-top: calc(4 * var(--px));
+			}
+
+			#blocos {
+				display: grid;
+				align-content: space-between;
+				gap: calc(14 * var(--px));
+			}
+
+			/* ------------------------------------------------------------------ um degrau */
+
+			.rotulo {
+				display: flex;
+				align-items: baseline;
+				gap: calc(12 * var(--px));
+				font-size: calc(19 * var(--px));
+				font-weight: var(--peso-enfase);
+				border-bottom: calc(2 * var(--px)) solid var(--n-800);
+				padding-bottom: calc(4 * var(--px));
+				margin-bottom: calc(8 * var(--px));
+			}
+
+			.rotulo b {
+				color: var(--marca-amarelo);
+				font-weight: var(--peso-destaque);
+			}
+
+			.rotulo span {
+				font-size: calc(15 * var(--px));
+				font-weight: var(--peso-corrente);
+				color: var(--n-400);
+			}
+
+			.variante {
+				display: grid;
+				grid-template-columns: calc(190 * var(--px)) 1fr;
+				align-items: center;
+				gap: calc(10 * var(--px));
+				margin-top: calc(8 * var(--px));
+			}
+
+			.etiqueta-da-variante {
+				font-size: calc(15 * var(--px));
+				color: var(--n-200);
+			}
+
+			.etiqueta-da-variante em {
+				display: block;
+				font-style: normal;
+				font-size: calc(13 * var(--px));
+				margin-top: calc(3 * var(--px));
+			}
+
+			.cabe {
+				color: var(--ok-claro);
+			}
+
+			.corta {
+				color: var(--erro-claro);
+				font-weight: var(--peso-destaque);
+			}
+
+			/*
+			 * **A faixa tem a largura que a grelha do painel tem, e corta como ela corta.**
+			 *
+			 * São os 1 872px do desenho — a janela menos as duas margens do corpo —, escritos como a
+			 * conta e não como o número, para acompanharem o `--px`. O `overflow: hidden` é o mesmo do
+			 * painel: o que transborda desaparece aqui como desapareceria lá, e é isso que se quer ver.
+			 * Quanto transborda está escrito ao lado, porque no ecrã não se consegue medir.
+			 */
+			.faixa {
+				width: calc(100vw - 48 * var(--px));
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>
+			Amostra dos degraus — entregas
+			<small id="subtitulo">a carregar o painel…</small>
+		</h1>
+
+		<div id="blocos"></div>
+
+		<script>
+			/*
+			 * Os degraus a mostrar. `folgada` fica de fora: tem 365px por coluna e aguenta tudo, e o
+			 * ecrã não dá para os quatro em tamanho real. A decisão em aberto é sobre estes três.
+			 */
+			const A_MOSTRAR = ['normal', 'apertada', 'cheia'];
+
+			/*
+			 * As duas variantes, que diferem **só** na etiqueta. Tudo o resto é igual de propósito:
+			 * um cartão que mudasse duas coisas ao mesmo tempo não responderia à pergunta.
+			 */
+			const VARIANTES = [
+				{ etiqueta: 'B912', descricao: 'etiqueta de 4 caracteres', nota: 'o cartão para que os degraus foram afinados' },
+				{ etiqueta: 'B1047', descricao: 'etiqueta de 5 caracteres', nota: 'um núcleo que passou dos mil' },
+			];
+
+			/* Estados e pesos a alternar ao longo da fila: uma fila toda igual não se parece com o painel. */
+			const FEITIOS = [
+				{ estado: 'entregue', peso: '15 kg', adultos: 3, criancas: 4 },
+				{ estado: 'entregue', peso: '8 kg', adultos: 2, criancas: null },
+				{ estado: 'por_entregar', peso: null, adultos: 5, criancas: 2 },
+				{ estado: 'entregue', peso: '124 kg', adultos: 4, criancas: 3 },
+				{ estado: 'falta', peso: null, adultos: 1, criancas: 1 },
+				{ estado: 'entregue', peso: '32 kg', adultos: 6, criancas: 4 },
+				{ estado: 'entregue', peso: '7 kg', adultos: null, criancas: null },
+				{ estado: 'por_entregar', peso: null, adultos: 2, criancas: 2 },
+				{ estado: 'entregue', peso: '300 kg', adultos: 12, criancas: 10 },
+			];
+
+			const SONDA_MAXIMA = 400;
+
+			/**
+			 * Que degraus existem e que contagens servem — **perguntado à `densidade()` do painel**.
+			 *
+			 * Nada disto está escrito aqui: nem os nomes, nem os cortes, nem quantos são. Se alguém
+			 * mexer nos degraus, esta página mostra os degraus novos.
+			 */
+			function degrausDoPainel() {
+				const limites = new Map();
+				for (let n = 1; n <= SONDA_MAXIMA; n++) {
+					const nome = densidade(n, 'entregas');
+					const anterior = limites.get(nome);
+					limites.set(nome, { de: anterior ? anterior.de : n, ate: n === SONDA_MAXIMA ? null : n });
+				}
+				return [...limites].map(([nome, faixa]) => ({ nome, ...faixa }));
+			}
+
+			/** Uma distância guardada numa variável CSS, em píxeis já resolvidos. Ver a nota no banco de medida. */
+			function distancia(prova, estilo, nome) {
+				prova.style.width = 'var(' + nome + ')';
+				const valor = Number.parseFloat(estilo.width);
+				prova.style.width = '';
+				return Number.isFinite(valor) ? valor : null;
+			}
+
+			/** Uma fila de cartões de um degrau, com a etiqueta pedida. Construída pelo painel. */
+			function fila(degrau, etiqueta, colunas) {
+				const grelha = document.createElement('div');
+				grelha.className = 'grelha';
+				grelha.dataset.area = 'entregas';
+				grelha.dataset.densidade = degrau;
+
+				for (let i = 0; i < colunas; i++) {
+					const feitio = FEITIOS[i % FEITIOS.length];
+					const div = document.createElement('div');
+					div.className = 'cartao';
+					div.dataset.estado = feitio.estado;
+					div.append(
+						...cartaoDeEntrega({
+							etiqueta: etiqueta,
+							nome: null,
+							adultos: feitio.adultos,
+							criancas: feitio.criancas,
+							pessoas: null,
+							hora: i % 3 === 0 ? '19:30' : '20:00',
+							peso: feitio.peso,
+							estado: feitio.estado,
+							extra: false,
+						}),
+					);
+					grelha.append(div);
+				}
+				return grelha;
+			}
+
+			function elemento(etiqueta, classe, texto) {
+				const el = document.createElement(etiqueta);
+				if (classe) el.className = classe;
+				if (texto !== undefined) el.textContent = texto;
+				return el;
+			}
+
+			function desenhar() {
+				const blocos = document.getElementById('blocos');
+				blocos.replaceChildren();
+
+				/* Elemento de prova, para resolver o `--colunas` de cada degrau a partir do CSS real. */
+				const prova = elemento('div');
+				prova.style.cssText = 'position:absolute; visibility:hidden; height:0';
+				const grelhaDeProva = elemento('div', 'grelha');
+				grelhaDeProva.dataset.area = 'entregas';
+				grelhaDeProva.style.cssText = 'display:block; position:absolute; visibility:hidden';
+				grelhaDeProva.append(prova);
+				document.body.append(grelhaDeProva);
+				const estiloDaProva = getComputedStyle(prova);
+
+				const porMedir = [];
+
+				for (const degrau of degrausDoPainel()) {
+					if (!A_MOSTRAR.includes(degrau.nome)) continue;
+
+					grelhaDeProva.dataset.densidade = degrau.nome;
+					const colunas = Number.parseInt(getComputedStyle(grelhaDeProva).getPropertyValue('--colunas'), 10);
+					const tecto = distancia(prova, estiloDaProva, '--largura');
+
+					const bloco = elemento('section');
+					const rotulo = elemento('div', 'rotulo');
+					rotulo.append(
+						elemento('b', null, degrau.nome),
+						elemento('span', null, `${colunas} colunas de ${Math.round(tecto)}px`),
+						elemento(
+							'span',
+							null,
+							degrau.ate === null ? `serve ${degrau.de} cartões ou mais` : `serve de ${degrau.de} a ${degrau.ate} cartões`,
+						),
+					);
+					bloco.append(rotulo);
+
+					for (const variante of VARIANTES) {
+						const linha = elemento('div', 'variante');
+
+						const legenda = elemento('div', 'etiqueta-da-variante');
+						legenda.append(document.createTextNode(variante.descricao), elemento('em', null, variante.nota));
+
+						const faixa = elemento('div', 'faixa');
+						const grelha = fila(degrau.nome, variante.etiqueta, colunas);
+						faixa.append(grelha);
+
+						linha.append(legenda, faixa);
+						bloco.append(linha);
+
+						/* Medir só depois de tudo estar no documento: antes disto não há larguras. */
+						porMedir.push({ legenda, faixa, grelha, colunas });
+					}
+
+					blocos.append(bloco);
+				}
+
+				grelhaDeProva.remove();
+
+				/*
+				 * **O veredicto de cada fila sai de a medir, não de a calcular.** É o mesmo princípio do
+				 * `degraus.test.ts`: pergunta-se ao browser onde é que os cartões ficaram.
+				 *
+				 * São dois números porque são duas perguntas, e a decisão precisa das duas: **o que a
+				 * coluna tem contra o que o cartão precisa**, que diz se a etiqueta de cinco caracteres
+				 * serve neste degrau e com que margem; e **quanto é que a fila transborda**, que é o que
+				 * se vê — ou melhor, o que deixa de se ver.
+				 */
+				for (const { legenda, faixa, grelha, colunas } of porMedir) {
+					const cartoes = [...grelha.children];
+
+					/*
+					 * A largura mínima do cartão mais largo da fila: põe-se cada um a `min-content` por
+					 * um instante e pergunta-se. Acontece tudo aqui dentro, antes de o browser pintar,
+					 * por isso não se vê nada a mexer.
+					 */
+					let minimo = 0;
+					for (const cartao of cartoes) {
+						cartao.style.width = 'min-content';
+						minimo = Math.max(minimo, cartao.getBoundingClientRect().width);
+						cartao.style.width = '';
+					}
+
+					const tem = faixa.clientWidth;
+					/* O que a fila ocupa mesmo: da borda esquerda do primeiro cartão à direita do último. */
+					const conteudo = cartoes.at(-1).getBoundingClientRect().right - cartoes[0].getBoundingClientRect().left;
+					const transborda = conteudo - tem;
+
+					/*
+					 * **O veredicto é o da fila, não o de uma coluna, e a diferença não é pedantismo.**
+					 *
+					 * As faixas de uma grelha dimensionam-se **coluna a coluna**: um cartão largo alarga
+					 * a coluna dele e deixa as outras como estavam. Dizer "a coluna tem 257px e o cartão
+					 * precisa de 261" e a seguir "cabe" seria contraditório — e seria a conta errada,
+					 * porque o que decide é a soma das colunas todas, cada uma com o cartão que lhe
+					 * calhou. Por isso o número que manda é o da fila, medido, e o do cartão mais largo
+					 * vai ao lado como contexto e não como comparação.
+					 */
+					const cabe = transborda <= 0.5;
+					const veredicto = elemento('em', cabe ? 'cabe' : 'corta');
+					veredicto.textContent = cabe
+						? `cabe — sobram ${Math.round(tem - conteudo)}px na fila (cartão mais largo: ${Math.round(minimo)}px)`
+						: `corta ${Math.round(transborda)}px da fila (cartão mais largo: ${Math.round(minimo)}px)`;
+					legenda.append(veredicto);
+				}
+
+				const l = window.innerWidth;
+				const a = window.innerHeight;
+				document.getElementById('subtitulo').textContent =
+					`Medidas reais do painel, nesta janela de ${l} × ${a} px CSS ` +
+					`(1 px do desenho = ${Math.min(l / 1920, a / 1080)
+						.toFixed(3)
+						.replace('.', ',')} px CSS). ` +
+					`Cada coluna é dimensionada pelo cartão que lhe calhou, não pelo mais largo da fila. ` +
+					`Página estática: lê o painel, não lê dados.` +
+					/* Num televisor não se rola: se não couber tudo, mais vale dizê-lo do que deixar metade escondida. */
+					(document.documentElement.scrollHeight > a + 1 ? ' ATENÇÃO: não cabe todo neste ecrã — falta ver mais abaixo.' : '');
+			}
+
+			async function principal() {
+				/* O painel primeiro, porque o `fetch` é travado a seguir. */
+				const html = await fetch('/painel.html').then((r) => r.text());
+
+				/*
+				 * As mesmas duas travas do banco de medida: sem token o painel manda o televisor para
+				 * o emparelhamento assim que arranca, e uma promessa que nunca resolve deixa-o à espera
+				 * em vez de decidir seja o que for. Ver `test/medidas/medir.html`.
+				 */
+				localStorage.setItem('refood.tv.token', 'amostra');
+				window.fetch = () => new Promise(() => {});
+
+				const painel = new DOMParser().parseFromString(html, 'text/html');
+				const meuEstilo = document.getElementById('estilo-da-pagina');
+
+				/* Esperar por cada folha externa: sem o `tokens.css` não há `--e-*` nem Inter. */
+				const folhas = [];
+				for (const original of painel.querySelectorAll('link[rel="stylesheet"]')) {
+					const folha = document.createElement('link');
+					folha.rel = 'stylesheet';
+					folha.href = original.getAttribute('href');
+					folhas.push(new Promise((ok) => ((folha.onload = ok), (folha.onerror = ok))));
+					document.head.insertBefore(folha, meuEstilo);
+				}
+				await Promise.all(folhas);
+
+				/*
+				 * **O estilo do painel entra antes do desta página, e a ordem é o que faz isto
+				 * funcionar.** O painel estiliza o `body` para um ecrã de televisão — `height: 100vh`,
+				 * `overflow: hidden`, uma grelha de três filas — e esta página precisa de um corpo
+				 * normal. Com a mesma especificidade ganha quem vem depois, por isso o dele é inserido
+				 * **antes** do meu: fica com os cartões, e eu fico com a página.
+				 */
+				for (const original of painel.querySelectorAll('style')) {
+					const estilo = document.createElement('style');
+					estilo.textContent = original.textContent;
+					document.head.insertBefore(estilo, meuEstilo);
+				}
+
+				/*
+				 * O corpo do painel, fora de vista: o script dele liga-se a elementos por `id` mal
+				 * arranca, e sem eles rebentava a meio — antes de definir o `cartaoDeEntrega` de que
+				 * esta página vive.
+				 */
+				const escondido = document.createElement('div');
+				escondido.hidden = true;
+				escondido.innerHTML = painel.body.innerHTML;
+				document.body.append(escondido);
+
+				const codigo = document.createElement('script');
+				codigo.textContent = painel.querySelector('script').textContent;
+				document.body.append(codigo);
+
+				/* As larguras são larguras de texto: sem a Inter carregada, mede-se outra fonte. */
+				await document.fonts.load('500 20px Inter');
+				await document.fonts.load('700 40px Inter');
+				await document.fonts.ready;
+
+				desenhar();
+			}
+
+			principal().catch((erro) => {
+				document.getElementById('subtitulo').textContent = `Não foi possível carregar o painel: ${erro}`;
+			});
+
+			/* A janela de um televisor não muda, mas a de um computador muda — e aqui tudo depende dela. */
+			window.addEventListener('resize', () => {
+				if (typeof cartaoDeEntrega === 'function') desenhar();
+			});
+		</script>
+	</body>
+</html>

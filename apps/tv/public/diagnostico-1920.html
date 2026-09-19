@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="pt-PT">
+	<head>
+		<meta charset="UTF-8" />
+		<!--
+			ESTA linha é a experiência. Não a tirar, e não a "corrigir" para `width=device-width`: a
+			página existe para saber o que este televisor faz com ela. Ver o comentário no <style>.
+		-->
+		<meta name="viewport" content="width=1920" />
+		<title>Refood — o ecrã respeita o meta viewport?</title>
+		<link rel="icon" href="/img/favicon.ico" sizes="any" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<style>
+			/*
+			 * Página irmã do `diagnostico.html`, e a única diferença que importa está no <head>: esta
+			 * declara `<meta name="viewport" content="width=1920">` e a outra não declara nada.
+			 *
+			 * **A pergunta.** O televisor medido reporta 960 × 540 px CSS com `devicePixelRatio: 2` —
+			 * 1920 × 1080 físicos, contados em metade. Não é defeito nem overscan: é a densidade
+			 * normal de uma Android TV, onde 1 px CSS = 1 dp = 2 px do painel. O painel de entregas
+			 * foi desenhado a assumir 1920 px CSS, e por isso aparece ao dobro do tamanho com um
+			 * quinto dos cartões.
+			 *
+			 * O `meta viewport` é a saída barata: se o browser o respeitar, a janela volta a 1920 px
+			 * CSS, o `devicePixelRatio` cai para 1, e o desenho actual rende exactamente como foi
+			 * pensado. **Se respeita não é previsível** — numa WebView depende de `useWideViewPort`
+			 * estar ligado na aplicação que a hospeda, não da televisão. Por isso se mede, ali.
+			 *
+			 * **A segunda pergunta, que a primeira esconde.** Respeitar não chega. Com 1920 px CSS em
+			 * 1920 px físicos, o número do cartão fica com 40 px reais no painel — que é o mínimo do
+			 * `design.md` para um televisor, mas um mínimo que nunca foi visto num. Por isso a página
+			 * mostra cartões a sério, nas medidas do degrau mais apertado. **Afasta-te até onde ficam
+			 * as pessoas e lê a hora.** Se não se lê, a resposta é não, mesmo que o número diga 1920.
+			 *
+			 * Estática como a irmã, e pela mesma razão: não faz `fetch`, não tem rota no Worker, não
+			 * lê o D1 nem o Odoo, e não sabe de que núcleo é este ecrã. O que mostra é o browser a
+			 * falar de si próprio. Apaga-se com ela quando os televisores estiverem escolhidos.
+			 */
+
+			* {
+				box-sizing: border-box;
+				margin: 0;
+			}
+
+			/*
+			 * **O texto da página em proporção da largura; o que está a ser medido, não.**
+			 *
+			 * A página tem de se ler venha a janela com 960 ou com 1920, e por isso o seu texto usa
+			 * `--u`, um milésimo da largura. **Os cartões de amostra e a régua usam píxeis fixos** —
+			 * é a unidade do painel, e é precisamente a coisa em julgamento.
+			 */
+			:root {
+				--u: 0.1vw;
+			}
+
+			body {
+				background: var(--n-950);
+				color: var(--n-000);
+				font-family: var(--fonte);
+				font-weight: 500;
+				line-height: 1.3;
+				min-height: 100vh;
+				overflow-x: hidden;
+				font-variant-numeric: tabular-nums;
+				padding: calc(var(--u) * 45);
+				font-size: calc(var(--u) * 11);
+			}
+
+			h1 {
+				font-size: calc(var(--u) * 26);
+				font-weight: var(--peso-destaque);
+			}
+
+			h1 small {
+				display: block;
+				font-size: calc(var(--u) * 10);
+				font-weight: var(--peso-corrente);
+				color: var(--n-400);
+				margin-top: calc(var(--u) * 5);
+			}
+
+			h2 {
+				font-size: calc(var(--u) * 14);
+				font-weight: var(--peso-enfase);
+				color: var(--marca-amarelo);
+				margin-bottom: calc(var(--u) * 8);
+			}
+
+			section {
+				margin-top: calc(var(--u) * 30);
+			}
+
+			p + p {
+				margin-top: calc(var(--u) * 8);
+			}
+
+			b.bom {
+				color: var(--ok-claro);
+			}
+
+			b.mau {
+				color: var(--erro-claro);
+			}
+
+			b.aviso {
+				color: var(--marca-amarelo);
+			}
+
+			.nota {
+				color: var(--n-400);
+				margin-top: calc(var(--u) * 8);
+			}
+
+			a {
+				color: var(--info-claro);
+			}
+
+			/* ------------------------------------------------------------------ números */
+
+			.numeros {
+				display: flex;
+				flex-wrap: wrap;
+				gap: calc(var(--u) * 10);
+			}
+
+			.caixa {
+				background: var(--n-900);
+				border: 1px solid var(--n-800);
+				border-radius: calc(var(--u) * 6);
+				padding: calc(var(--u) * 10) calc(var(--u) * 14);
+				min-width: calc(var(--u) * 190);
+			}
+
+			.caixa[data-destaque='sim'] {
+				border-color: var(--marca-amarelo);
+			}
+
+			.caixa dt {
+				font-size: calc(var(--u) * 9);
+				color: var(--n-400);
+				margin-bottom: calc(var(--u) * 4);
+			}
+
+			.caixa dd {
+				font-size: calc(var(--u) * 22);
+				font-weight: var(--peso-destaque);
+			}
+
+			.caixa dd small {
+				font-size: calc(var(--u) * 9);
+				font-weight: var(--peso-corrente);
+				color: var(--n-400);
+				margin-left: calc(var(--u) * 4);
+			}
+
+			.veredicto {
+				background: var(--n-900);
+				border-left: calc(var(--u) * 6) solid var(--n-600);
+				border-radius: calc(var(--u) * 4);
+				padding: calc(var(--u) * 14) calc(var(--u) * 18);
+			}
+
+			/* --------------------------------------------------------- a régua de 1920 */
+
+			/*
+			 * **A resposta sem ler um número.** Esta barra tem 1920 px CSS exactos. Se o browser
+			 * respeitou o `meta`, ela acaba na borda direita e vê-se a marca verde do fim. Se não
+			 * respeitou, a janela tem 960 e metade da barra ficou de fora, com a marca verde nela.
+			 *
+			 * Serve para quem está de pé à frente do televisor, longe demais para ler as caixas.
+			 */
+			.regua-1920 {
+				position: relative;
+				width: 1920px;
+				height: 56px;
+				background: linear-gradient(90deg, var(--n-800), var(--n-600));
+				border-radius: 4px;
+			}
+
+			.regua-1920 span {
+				position: absolute;
+				top: 0;
+				bottom: 0;
+				display: grid;
+				place-items: center;
+				padding: 0 10px;
+				font-size: 20px;
+				font-weight: var(--peso-destaque);
+				color: var(--marca-preto);
+				background: var(--marca-amarelo);
+			}
+
+			.regua-1920 span[data-ponta='fim'] {
+				right: 0;
+				background: var(--ok-claro);
+			}
+
+			/* ---------------------------------------------------------------- a amostra */
+
+			/*
+			 * Cartões do degrau `cheia` — o mais apertado do painel, o dos turnos de 90 famílias —
+			 * nas medidas exactas com que o `painel.html` os desenha: número a 40px, quilos a 24px,
+			 * detalhe a 20px, moldura de 3px com a barra de 12px à esquerda, cartão de 180px.
+			 *
+			 * Em píxeis fixos, de propósito, e por isso é que esta secção vale a página toda: sob
+			 * `width=1920` estes cartões saem do televisor com o tamanho físico que teriam no painel
+			 * a sério. É a amostra, não o veredicto lá em cima, que decide.
+			 */
+			.amostra {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+			}
+
+			.cartao {
+				width: 180px;
+				border: 3px solid var(--ok-claro);
+				border-left-width: 12px;
+				border-radius: 8px;
+				background: color-mix(in srgb, var(--ok-claro) 14%, transparent);
+				padding: 4px 8px;
+				display: grid;
+				grid-template-columns: 1fr auto;
+				align-items: center;
+				gap: 4px 8px;
+				font-weight: 500;
+			}
+
+			.cartao .numero {
+				font-size: 40px;
+				font-weight: var(--peso-destaque);
+				line-height: 1;
+				white-space: nowrap;
+			}
+
+			.cartao .peso {
+				font-size: 24px;
+				font-weight: var(--peso-destaque);
+				line-height: 1;
+				color: var(--ok-claro);
+				white-space: nowrap;
+				text-align: right;
+			}
+
+			.cartao .peso small {
+				font-size: 0.4em;
+				font-weight: var(--peso-corrente);
+				margin-left: 0.15em;
+			}
+
+			.cartao .detalhe {
+				grid-column: 1 / -1;
+				font-size: 20px;
+				color: var(--n-400);
+				display: flex;
+				gap: 16px;
+				white-space: nowrap;
+			}
+
+			.ua {
+				margin-top: calc(var(--u) * 30);
+				font-size: calc(var(--u) * 8);
+				color: var(--n-600);
+				word-break: break-all;
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>
+				O ecrã respeita o <code>meta viewport</code>?
+				<small>
+					Esta página declara <code>width=1920</code>; a do lado — <a href="/diagnostico.html">diagnostico.html</a> — não declara nada. Abre
+					as duas no mesmo televisor e compara a primeira caixa.
+				</small>
+			</h1>
+
+			<div class="veredicto" style="border-left-color: var(--ok-claro)">
+				<p>
+					<b class="bom">A decisão que esta página existia para tomar já foi tomada, e não foi esta.</b> O painel passou a estar escrito em
+					fracções do ecrã — o <code>--px</code> do <code>painel.html</code> — e enche a janela que houver, com o mesmo resultado no vidro a
+					960, a 1920 ou a 3840. <b>O <code>meta viewport</code> deixou de ser preciso</b>, e uma largura fixa de 1920 seria outra vez a
+					suposição que causou tudo isto.
+				</p>
+				<p>
+					O que fica aqui vale por outra razão: saber se este televisor honra o <code>meta</code> diz o que a caixa faz às páginas em geral,
+					e sobretudo <b>a amostra lá em baixo mostra o cartão no tamanho físico do desenho</b> — que continua a ser a única maneira de
+					julgar, de pé e a três metros, se aquela letra se lê nesta sala.
+				</p>
+			</div>
+
+			<section>
+				<h2>O que o browser reporta, com <code>width=1920</code></h2>
+				<dl class="numeros" id="numeros"></dl>
+			</section>
+
+			<section>
+				<h2>Veredicto</h2>
+				<div class="veredicto" id="veredicto"></div>
+			</section>
+
+			<section>
+				<h2>A régua de 1920 px</h2>
+				<div class="regua-1920"><span data-ponta="inicio">0</span><span data-ponta="fim">1920</span></div>
+				<p class="nota">
+					A barra tem 1920 px CSS. <b>Se vês a marca verde do <code>1920</code> encostada à borda direita</b>, o televisor respeitou o
+					<code>meta</code>. Se a barra sai do ecrã e a marca verde não aparece, não respeitou.
+				</p>
+			</section>
+
+			<section>
+				<h2>O cartão, no tamanho desenhado</h2>
+				<div class="amostra" id="amostra"></div>
+				<p class="nota">
+					É o degrau mais apertado do painel — o dos turnos de 90 famílias —, nas medidas exactas do <code>painel.html</code>.
+					<b>Afasta-te até onde ficam as pessoas na cozinha e lê a hora e as contagens.</b> É esta a pergunta que decide, e o número da
+					caixa lá em cima não a responde: um <code>meta</code> respeitado que deixe o painel ilegível a três metros é uma resposta
+					negativa.
+				</p>
+			</section>
+
+			<p class="ua" id="ua"></p>
+		</main>
+
+		<script>
+			/* Formas que o painel produz: número curto e longo, peso de um a três dígitos, com e sem contagens. */
+			const AMOSTRA = [
+				{ numero: 'B912', peso: '15', detalhe: ['19:30', '3A 4C'] },
+				{ numero: 'B1047', peso: '8', detalhe: ['19:30', '2A'] },
+				{ numero: 'B33', peso: '124', detalhe: ['20:00', '5A 2C'] },
+				{ numero: 'B788', peso: '3', detalhe: ['20:00', '1A 1C'] },
+			];
+
+			function caixa(rotulo, valor, unidade, destaque) {
+				const d = document.createElement('div');
+				d.className = 'caixa';
+				if (destaque) d.dataset.destaque = 'sim';
+
+				const dt = document.createElement('dt');
+				dt.textContent = rotulo;
+
+				const dd = document.createElement('dd');
+				dd.textContent = valor;
+				if (unidade) {
+					const s = document.createElement('small');
+					s.textContent = unidade;
+					dd.append(s);
+				}
+
+				d.append(dt, dd);
+				return d;
+			}
+
+			function p(partes) {
+				const el = document.createElement('p');
+				el.append(...partes);
+				return el;
+			}
+
+			function forte(texto, classe) {
+				const b = document.createElement('b');
+				b.textContent = texto;
+				if (classe) b.className = classe;
+				return b;
+			}
+
+			function t(texto) {
+				return document.createTextNode(texto);
+			}
+
+			function desenharAmostra() {
+				const alvo = document.getElementById('amostra');
+				alvo.replaceChildren();
+
+				for (const c of AMOSTRA) {
+					const cartao = document.createElement('div');
+					cartao.className = 'cartao';
+
+					const numero = document.createElement('div');
+					numero.className = 'numero';
+					numero.textContent = c.numero;
+
+					const peso = document.createElement('div');
+					peso.className = 'peso';
+					peso.textContent = c.peso;
+					const unidade = document.createElement('small');
+					unidade.textContent = 'kg';
+					peso.append(unidade);
+
+					const detalhe = document.createElement('div');
+					detalhe.className = 'detalhe';
+					for (const parte of c.detalhe) {
+						const s = document.createElement('span');
+						s.textContent = parte;
+						detalhe.append(s);
+					}
+
+					cartao.append(numero, peso, detalhe);
+					alvo.append(cartao);
+				}
+			}
+
+			function medir() {
+				const l = window.innerWidth;
+				const a = window.innerHeight;
+				const dpr = window.devicePixelRatio || 1;
+
+				document
+					.getElementById('numeros')
+					.replaceChildren(
+						caixa('Janela, com width=1920', l + ' × ' + a, 'px CSS', true),
+						caixa('devicePixelRatio', String(dpr), dpr === 1 ? '' : '×'),
+						caixa('Píxeis reais no painel', Math.round(l * dpr) + ' × ' + Math.round(a * dpr), 'px'),
+						caixa('1 px CSS vale', dpr === 1 ? '1 px do painel' : dpr + ' px do painel', ''),
+					);
+
+				const v = document.getElementById('veredicto');
+				v.replaceChildren();
+
+				/*
+				 * Tolerância larga de propósito: um browser pode devolver 1920 exactos, 1912 por causa
+				 * de uma barra de deslocamento, ou 1928 por arredondamento da escala. Perto é sim.
+				 */
+				const respeitou = Math.abs(l - 1920) <= 40;
+
+				if (respeitou) {
+					v.append(
+						p([
+							forte('Respeitou. ', 'bom'),
+							t(
+								'A janela passou a ' +
+									l +
+									' px CSS, e o painel de entregas rende neste televisor exactamente como foi desenhado: 8 colunas por 9 linhas, 72 lugares para um maior turno de 65.',
+							),
+						]),
+						p([
+							t('Falta a outra metade da pergunta. Com '),
+							forte('1 px CSS = 1 px do painel'),
+							t(
+								', o número do cartão fica com 40 px reais e a hora com 20 px. Desce até à amostra, afasta-te, e decide se aquilo se lê. É a parte disto que nenhum número responde.',
+							),
+						]),
+						p([
+							forte('E mesmo respeitando, o 1920 fixo não fecha o assunto.', 'aviso'),
+							t(
+								' É uma largura assumida, que é exactamente o que partiu aqui: o próximo televisor pode reportar 3840 e o painel sai do sítio outra vez, ao contrário. Isto compra tempo — não resolve.',
+							),
+						]),
+					);
+				} else if (l < 1200) {
+					v.append(
+						p([
+							forte('Não respeitou. ', 'mau'),
+							t(
+								'A janela continua com ' +
+									l +
+									' px CSS apesar de o meta pedir 1920. Numa WebView é o que acontece quando a aplicação que a hospeda não tem useWideViewPort ligado — no Fully Kiosk a definição existe e chama-se "Enable Wide Viewport". Vale a pena ligá-la e recarregar esta página antes de concluir.',
+							),
+						]),
+						p([
+							t('Se depois disso continuar assim, o '),
+							forte('meta viewport'),
+							t(' está fora de questão e o painel tem de passar a medidas proporcionais à janela. Não há terceira via.'),
+						]),
+					);
+				} else {
+					v.append(
+						p([
+							forte('Resposta ambígua: ' + l + ' px CSS. ', 'aviso'),
+							t(
+								'Não é o 1920 pedido nem a largura nativa do aparelho. Confirma que o zoom do browser está a 100% e compara com o que a página do lado reporta sem meta nenhum.',
+							),
+						]),
+					);
+				}
+
+				document.getElementById('ua').textContent = navigator.userAgent;
+			}
+
+			desenharAmostra();
+			medir();
+			window.addEventListener('resize', medir);
+		</script>
+	</body>
+</html>
