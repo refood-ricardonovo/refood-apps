@@ -1562,9 +1562,26 @@
 				return marca;
 			}
 
+			/**
+			 * O título do separador acompanha o painel que está no ecrã.
+			 *
+			 * **Chamado de onde a área passa a ser verdade, e não de onde ela muda.** O sítio óbvio era
+			 * o `alternarArea`, e seria o errado: ali a área já mudou mas a grelha ainda mostra os
+			 * cartões da outra, e continua a mostrá-los se o pedido falhar. Um separador a dizer
+			 * "recolhas" por cima de um ecrã de entregas é pior do que um separador desactualizado.
+			 *
+			 * Num televisor ninguém vê isto — está em ecrã inteiro. Quem vê é quem tem meia dúzia de
+			 * separadores abertos a olhar para ecrãs diferentes, e para esse é a única coisa que os
+			 * distingue.
+			 */
+			function mostrarTitulo() {
+				document.title = `Refood — ${area}`;
+			}
+
 			function desenharGrelha(painel) {
 				const grelha = el('grelha');
 				grelha.dataset.area = area;
+				mostrarTitulo();
 				grelha.dataset.densidade = densidade(painel.cartoes.length, area);
 				grelha.replaceChildren();
 
@@ -1875,6 +1892,10 @@
 					return;
 				}
 				area = escolhido;
+
+				// Já aqui, e não só no primeiro desenho: um ecrã que abra nas recolhas não tem de passar
+				// pelo separador a dizer "entregas" enquanto o primeiro pedido não volta.
+				mostrarTitulo();
 			}
 
 			function alternarArea() {
