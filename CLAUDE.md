@@ -174,7 +174,12 @@ estão nos ficheiros de conhecimento (`arquitetura.md`, `modelos-odoo.md` e os d
   que há é pior do que admiti-lo. A consequência é de exposição, e está na secção respectiva: texto
   livre escrito por voluntários não vai para um televisor sem decisão escrita na rota.
 - **A TV nunca escreve no Odoo**, e no D1 escreve só o seu próprio estado técnico — sinal de vida,
-  emparelhamento, trava de tentativas. Um ecrã de cozinha não tem pessoa identificada atrás, e um
+  emparelhamento, trava de tentativas, e a configuração que a sede dá a cada ecrã: com que painel
+  arranca e uma etiqueta curta de local. **Esta última é texto livre, e reabre uma decisão que a
+  migração `0002` tinha fechado** — a razão, o que mudou, e a cerca que a segura (nunca sai do
+  admin, e nem sequer entra na sessão da TV) estão no `apps/tv/CLAUDE.md`. Vale-lhe a mesma
+  advertência das notas: a proibição é sobre colunas e não sobre conteúdo, e a mitigação é a
+  exposição. Um ecrã de cozinha não tem pessoa identificada atrás, e um
   ecrã por onde qualquer um passa não marca presenças. **A PWA pode escrever no Odoo**, rota a rota,
   com decisão escrita.
 - **"O Odoo não pode ser alterado" é sobre estrutura** — módulos, modelos, campos —, porque é gerido

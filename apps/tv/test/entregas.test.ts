@@ -49,7 +49,7 @@ function leitorFalso(respostas: Record<string, unknown[]>): { leitor: LeitorDoNu
 
 function contextoFalso(leitor: LeitorDoNucleo, vista: Partial<VistaPedida> = {}): ContextoTv {
 	return {
-		sessao: { dispositivo: 'dis_teste', empresa: EMPRESA },
+		sessao: { dispositivo: 'dis_teste', empresa: EMPRESA, painelInicial: null },
 		leitor,
 		vista: { dia: null, turno: null, ...vista },
 		lingua: LINGUA_DA_TV,

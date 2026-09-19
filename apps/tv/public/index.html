@@ -196,6 +196,19 @@
 			const RECUO_MS = 10000;
 
 			/**
+			 * Quanto tempo um pedido tem para responder antes de se desistir dele.
+			 *
+			 * **Um `fetch` pendurado não rejeita nunca**, e este ecrã é onde isso custa mais caro: quem
+			 * está a instalar está ao telefone com a sede, e um código que não aparece nem dá erro não
+			 * dá nada para dizer do outro lado. A rede em baixo rejeita e está tratada; o wi-fi fraco de
+			 * uma cozinha, o portal cativo e o proxy que aceita a ligação e emudece não rejeitam nada.
+			 *
+			 * Dez segundos, que é o recuo entre tentativas: desistir mais tarde do que isso encavalitava
+			 * pedidos, e o ciclo já volta a tentar sozinho.
+			 */
+			const PRAZO_DO_PEDIDO_MS = 10000;
+
+			/**
 			 * De quanto em quanto tempo o ecrã diz que está vivo.
 			 *
 			 * Cinco minutos é o que limita duas coisas ao mesmo tempo: quanto tempo um ecrã revogado
@@ -254,13 +267,42 @@
 				}
 			}
 
+			/**
+			 * Um pedido do emparelhamento, com prazo.
+			 *
+			 * **Quem chama trata a falha como sempre tratou:** isto continua a atirar, e um pedido que
+			 * estoire o prazo atira um `AbortError` que cai nos mesmos `catch` que já existiam para a
+			 * falta de rede. O que muda é que agora há por onde cair — antes ficava pendurado.
+			 *
+			 * `AbortController` à mão e não `AbortSignal.timeout`: o atalho só existe a partir do Chrome
+			 * 103, e estes ecrãs correm na WebView que a box tiver.
+			 */
+			/**
+			 * A frase que descreve uma falha de rede, seja ela qual for.
+			 *
+			 * Existe porque os três chamadores do `pedir` faziam a mesma coisa com a mesma frase, e
+			 * passaram a ter de distinguir duas: sem isto, a distinção ficava copiada em três sítios e
+			 * ao terceiro alguém esquecia-se.
+			 */
+			function fraseDaFalha(erro) {
+				return erro?.name === 'AbortError' ? 'O servidor não respondeu a tempo.' : 'Sem ligação à rede.';
+			}
+
 			async function pedir(caminho, corpo) {
-				const resposta = await fetch(caminho, {
-					method: 'POST',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify(corpo),
-				});
-				return { estadoHttp: resposta.status, corpo: await resposta.json().catch(() => ({})) };
+				const travao = new AbortController();
+				const alarme = setTimeout(() => travao.abort(), PRAZO_DO_PEDIDO_MS);
+
+				try {
+					const resposta = await fetch(caminho, {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify(corpo),
+						signal: travao.signal,
+					});
+					return { estadoHttp: resposta.status, corpo: await resposta.json().catch(() => ({})) };
+				} finally {
+					clearTimeout(alarme);
+				}
 			}
 
 			/**
@@ -279,8 +321,8 @@
 				let resposta;
 				try {
 					resposta = await pedir('/api/emparelhamento', { segredo_hash: await hash(segredo) });
-				} catch {
-					avisar('Sem ligação à rede.');
+				} catch (falha) {
+					avisar(fraseDaFalha(falha));
 					return;
 				}
 
@@ -316,9 +358,10 @@
 				let resposta;
 				try {
 					resposta = await pedir('/api/emparelhamento/estado', { codigo: guardado.codigo, segredo: guardado.segredo });
-				} catch {
-					// Rede em baixo. O código continua válido, por isso fica no ecrã e tenta-se a seguir.
-					avisar('Sem ligação à rede.');
+				} catch (falha) {
+					// Rede em baixo ou servidor mudo. O código continua válido, por isso fica no ecrã e
+					// tenta-se a seguir — não se desiste de um emparelhamento por causa de uma sondagem.
+					avisar(fraseDaFalha(falha));
 					return;
 				}
 
@@ -332,8 +375,8 @@
 				let resposta;
 				try {
 					resposta = await pedir('/api/emparelhamento/recolher', { codigo: guardado.codigo, segredo: guardado.segredo });
-				} catch {
-					avisar('Sem ligação à rede.');
+				} catch (falha) {
+					avisar(fraseDaFalha(falha));
 					return;
 				}
 
@@ -360,12 +403,19 @@
 				const token = localStorage.getItem(TOKEN);
 				if (!token) return null;
 
+				const travao = new AbortController();
+				const alarme = setTimeout(() => travao.abort(), PRAZO_DO_PEDIDO_MS);
+
 				let resposta;
 				try {
-					resposta = await fetch(caminho, { method: metodo, headers: { authorization: `Bearer ${token}` } });
+					resposta = await fetch(caminho, { method: metodo, headers: { authorization: `Bearer ${token}` }, signal: travao.signal });
 				} catch {
-					avisar('Sem ligação à rede.');
+					// Rede em baixo e servidor mudo mandam procurar em sítios diferentes, e quem está a
+					// instalar tem alguém ao telefone à espera de saber qual dos dois é.
+					avisar(travao.signal.aborted ? 'O servidor não respondeu a tempo.' : 'Sem ligação à rede.');
 					return null;
+				} finally {
+					clearTimeout(alarme);
 				}
 
 				if (resposta.status === 401) {

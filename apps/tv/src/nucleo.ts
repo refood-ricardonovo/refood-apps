@@ -10,6 +10,7 @@
  * numa cozinha.
  */
 
+import { PAINEIS, PAINEL_POR_OMISSAO } from './paineis';
 import type { RotaTv } from './sessao';
 
 /**
@@ -42,6 +43,33 @@ export const rotaNucleo: RotaTv = async ({ sessao, leitor }) => {
 
 	return Response.json({ ok: true, nucleo: { nome: empresa.name } });
 };
+
+/**
+ * `GET /api/ecra` — a configuração deste ecrã. Hoje, o painel com que arranca.
+ *
+ * **Rota separada da do núcleo, e não é arrumação.** O que o `/api/nucleo` devolve é do **núcleo** —
+ * igual nos dois televisores da mesma cozinha, e por isso guardável numa cache partilhada por
+ * núcleo, que é como as leituras ao Odoo aqui funcionam. Isto é do **ecrã**: se os dois valores
+ * viajassem na mesma resposta, o dia em que alguém pusesse um `cache` nessa leitura passava a
+ * servir a configuração de um televisor ao outro — e o sintoma seria os dois abrirem no mesmo
+ * painel, que é exactamente o que esta funcionalidade existe para evitar. Separadas, não há como.
+ *
+ * **Nunca leva o `local`.** A etiqueta que a sede escreve é de gestão e não sai do admin; nem
+ * sequer chega à sessão — ver o `autenticarDispositivo`.
+ *
+ * O valor sai tal e qual da base, com a lista dos painéis que este Worker conhece ao lado. É o
+ * televisor que decide o que fazer com um que não reconheça, porque é ele que sabe quais é que
+ * sabe desenhar — durante uma actualização os dois lados não estão na mesma versão.
+ */
+export const rotaEcra: RotaTv = async ({ sessao }) =>
+	Response.json({
+		ok: true,
+		ecra: {
+			painel_inicial: sessao.painelInicial,
+			paineis: PAINEIS,
+			por_omissao: PAINEL_POR_OMISSAO,
+		},
+	});
 
 /**
  * `POST /api/sinal` — o sinal de vida.

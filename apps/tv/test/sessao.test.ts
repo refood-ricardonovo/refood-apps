@@ -48,7 +48,7 @@ describe('autenticarDispositivo', () => {
 	it('resolve o token no dispositivo e no seu núcleo', async () => {
 		const resultado = await autenticarDispositivo(db, pedido());
 
-		expect(resultado).toMatchObject({ estado: 'ok', sessao: { dispositivo: 'd1', empresa: EMPRESA } });
+		expect(resultado).toMatchObject({ estado: 'ok', sessao: { dispositivo: 'd1', empresa: EMPRESA, painelInicial: null } });
 	});
 
 	it('recusa um token que não existe, sem dizer que não existe', async () => {
@@ -84,7 +84,10 @@ describe('servirRotaTv', () => {
 		const resposta = await servirRotaTv(pedido(), env, espia, { agora: AGORA });
 
 		expect(resposta.status).toBe(200);
-		expect(await resposta.json()).toEqual({ sessao: { dispositivo: 'd1', empresa: EMPRESA }, empresaDoLeitor: EMPRESA });
+		expect(await resposta.json()).toEqual({
+			sessao: { dispositivo: 'd1', empresa: EMPRESA, painelInicial: null },
+			empresaDoLeitor: EMPRESA,
+		});
 	});
 
 	it('dá 401 a um revogado, e regista-o', async () => {
@@ -154,14 +157,14 @@ describe('sinal de vida', () => {
 	it('uma marca ilegível conta como velha e é reescrita', async () => {
 		await db.prepare("UPDATE dispositivos SET visto_em = 'não é uma data' WHERE id = 'd1'").run();
 
-		expect(await registarSinalDeVida(db, { dispositivo: 'd1', empresa: EMPRESA }, 'não é uma data', AGORA)).toBe(true);
+		expect(await registarSinalDeVida(db, { dispositivo: 'd1', empresa: EMPRESA, painelInicial: null }, 'não é uma data', AGORA)).toBe(true);
 		expect(db.sql("SELECT visto_em FROM dispositivos WHERE id = 'd1'")[0]!.visto_em).toBe(AGORA.toISOString());
 	});
 
 	it('não marca sinal de vida num dispositivo revogado', async () => {
 		await db.prepare("UPDATE dispositivos SET revogado = 1 WHERE id = 'd1'").run();
 
-		await registarSinalDeVida(db, { dispositivo: 'd1', empresa: EMPRESA }, null, AGORA);
+		await registarSinalDeVida(db, { dispositivo: 'd1', empresa: EMPRESA, painelInicial: null }, null, AGORA);
 
 		expect(db.sql("SELECT visto_em FROM dispositivos WHERE id = 'd1'")[0]!.visto_em).toBeNull();
 	});

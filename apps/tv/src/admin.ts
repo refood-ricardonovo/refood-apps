@@ -29,6 +29,7 @@
 
 import { createOdooClient, type OdooEnv } from '@refood/odoo';
 import { deviceOrdinals, hasExpired, sha256Hex, transition, type LinhaDispositivo } from './auth';
+import { PAINEIS, PAINEL_POR_OMISSAO, painelValido } from './paineis';
 import { LINGUA_DA_TV } from './sessao';
 
 export interface EnvAdmin extends Partial<OdooEnv> {
@@ -97,6 +98,12 @@ export interface DispositivoAdmin {
 	versao: string | null;
 	revogado: boolean;
 	revogado_em: string | null;
+	/** O painel com que o ecrã arranca. `null` = o por omissão. */
+	painel_inicial: string | null;
+	/** A etiqueta de local, escrita na sede. Só existe deste lado — nunca vai para um televisor. */
+	local: string | null;
+	/** Há outro ecrã vivo no mesmo núcleo com esta etiqueta. Ver o `formaDoLocal`. */
+	local_repetido: boolean;
 }
 
 /* ---------------------------------------------------- trava de tentativas */
@@ -274,10 +281,19 @@ export async function aprovarEmparelhamento(db: D1Database, codigo: string, empr
 export async function listarDispositivos(db: D1Database): Promise<DispositivoAdmin[]> {
 	const { results } = await db
 		.prepare(
-			`SELECT id, company_id, criado_em, visto_em, versao, revogado, revogado_em
+			`SELECT id, company_id, criado_em, visto_em, versao, revogado, revogado_em, painel_inicial, local
 			 FROM dispositivos ORDER BY company_id ASC, criado_em ASC, id ASC LIMIT 500`,
 		)
-		.all<LinhaDispositivo & { visto_em: string | null; versao: string | null; revogado: number; revogado_em: string | null }>();
+		.all<
+			LinhaDispositivo & {
+				visto_em: string | null;
+				versao: string | null;
+				revogado: number;
+				revogado_em: string | null;
+				painel_inicial: string | null;
+				local: string | null;
+			}
+		>();
 
 	const porEmpresa = new Map<number, typeof results>();
 	for (const linha of results) {
@@ -289,6 +305,23 @@ export async function listarDispositivos(db: D1Database): Promise<DispositivoAdm
 	const dispositivos: DispositivoAdmin[] = [];
 	for (const [empresa, linhas] of porEmpresa) {
 		const ordinais = deviceOrdinals(linhas, empresa);
+
+		/*
+		 * **Etiquetas repetidas dentro do núcleo, contadas aqui e não na página.**
+		 *
+		 * Pela mesma razão que o ordinal: é uma conta sobre o conjunto das linhas, e o servidor é
+		 * quem as tem todas. A página mostra o que vier — como já faz com o número do ecrã.
+		 *
+		 * **Só entre ecrãs vivos.** A etiqueta de um revogado não colide com nada: aquele ecrã já não
+		 * está na parede, e marcá-lo mandava alguém procurar um problema que não existe.
+		 */
+		const quantos = new Map<string, number>();
+		for (const linha of linhas) {
+			if (linha.revogado === 1 || !linha.local) continue;
+			const forma = formaDoLocal(linha.local);
+			quantos.set(forma, (quantos.get(forma) ?? 0) + 1);
+		}
+
 		for (const linha of linhas) {
 			dispositivos.push({
 				id: linha.id,
@@ -299,11 +332,113 @@ export async function listarDispositivos(db: D1Database): Promise<DispositivoAdm
 				versao: linha.versao,
 				revogado: linha.revogado === 1,
 				revogado_em: linha.revogado_em,
+				painel_inicial: linha.painel_inicial,
+				local: linha.local,
+				local_repetido: linha.revogado !== 1 && !!linha.local && (quantos.get(formaDoLocal(linha.local)) ?? 0) > 1,
 			});
 		}
 	}
 
 	return dispositivos;
+}
+
+/** O tecto da etiqueta de local, em unidades UTF-16 — ver a nota do `localValido`. */
+export const MAX_LOCAL = 30;
+
+/**
+ * A forma de uma etiqueta para efeitos de comparação: sem maiúsculas e sem acentos.
+ *
+ * "Cozinha", "cozinha" e "COZINHA" são o mesmo sítio, e quem escreve "Sala de convivio" à pressa
+ * quer dizer o mesmo que "Sala de convívio". **A comparação erra de propósito para o lado de
+ * avisar:** um aviso a mais custa um olhar, e um aviso que não aparece custa uma revogação no ecrã
+ * errado.
+ */
+export function formaDoLocal(texto: string | null): string {
+	return (texto ?? '')
+		.normalize('NFD')
+		.replace(/\p{Diacritic}/gu, '')
+		.toLowerCase()
+		.trim();
+}
+
+/**
+ * Valida a etiqueta de local que vem do admin.
+ *
+ * Devolve a etiqueta pronta a guardar, `null` para a limpar, ou `undefined` para a recusar.
+ *
+ * O que recusa, e porquê:
+ *
+ * - **Quebras de linha e caracteres de controlo.** É um rótulo de uma linha numa lista; um `
+`
+ *   lá dentro não se vê no campo e desalinha tudo o que o mostrar a seguir.
+ * - **Mais de 30 unidades.** A contagem é a do JavaScript — unidades UTF-16 — e o `CHECK` da base
+ *   conta caracteres, que para um emoji dá menos. **Ser o JS o mais apertado dos dois é
+ *   deliberado:** assim o `CHECK` nunca dispara, e uma etiqueta recusada volta como 400 e não como
+ *   500.
+ *
+ * O espaço à volta é aparado e os espaços interiores são colapsados antes de contar: uma etiqueta
+ * que só difere da outra por dois espaços não é outra etiqueta, e quem escreve numa lista larga
+ * deixa espaços sem dar por isso.
+ *
+ * **O que não valida é o conteúdo.** Nada aqui impede "Cozinha da Dona Maria". Ver a nota da
+ * migração `0005` e a secção respectiva do `CLAUDE.md`: a mitigação não é a validação, é isto
+ * nunca sair do admin.
+ */
+export function localValido(valor: unknown): string | null | undefined {
+	if (valor === null) return null;
+	if (typeof valor !== 'string') return undefined;
+
+	/* Sem regex: um intervalo de caracteres de controlo escrito à mão é fácil de ler mal, e estes não se veem. */
+	for (const caracter of valor) {
+		const codigo = caracter.codePointAt(0) ?? 0;
+		if (codigo < 0x20 || codigo === 0x7f) return undefined;
+	}
+
+	const limpa = valor.replace(/\s+/gu, ' ').trim();
+	if (limpa.length === 0) return null;
+	return limpa.length <= MAX_LOCAL ? limpa : undefined;
+}
+
+/**
+ * Escreve a configuração de um ecrã: o painel com que arranca e a etiqueta de local.
+ *
+ * **Os dois campos são opcionais e independentes.** Quem só manda o `local` não mexe no painel, e
+ * ao contrário: a página edita os dois juntos, mas a rota não obriga a isso, e uma correcção
+ * futura que só toque num não tem de reenviar o outro à espera de que não se tenha perdido pelo
+ * caminho.
+ *
+ * Não actua sobre um dispositivo revogado. Não é uma regra de segurança — quem tem o segredo do
+ * admin podia revogar e voltar a escrever — é para a lista não convidar a arrumar ecrãs que já não
+ * existem, e para o `revogado_em` continuar a ser a última coisa que aconteceu àquela linha.
+ */
+export async function configurarDispositivo(
+	db: D1Database,
+	id: string,
+	campos: { painel_inicial?: string | null; local?: string | null },
+): Promise<'guardado' | 'revogado' | 'inexistente'> {
+	const partes: string[] = [];
+	const valores: (string | null)[] = [];
+
+	if ('painel_inicial' in campos) {
+		partes.push('painel_inicial = ?');
+		valores.push(campos.painel_inicial ?? null);
+	}
+	if ('local' in campos) {
+		partes.push('local = ?');
+		valores.push(campos.local ?? null);
+	}
+	if (partes.length === 0) return 'guardado';
+
+	const resultado = await db
+		.prepare(`UPDATE dispositivos SET ${partes.join(', ')} WHERE id = ? AND revogado = 0`)
+		.bind(...valores, id)
+		.run();
+
+	if (resultado.meta.changes === 1) return 'guardado';
+
+	const linha = await db.prepare('SELECT revogado FROM dispositivos WHERE id = ?').bind(id).first<{ revogado: number }>();
+	if (!linha) return 'inexistente';
+	return linha.revogado === 1 ? 'revogado' : 'guardado';
 }
 
 /**
@@ -502,7 +637,74 @@ export async function rotaAdmin(request: Request, env: EnvAdmin, agora = new Dat
 	}
 
 	if (caminho === '/api/admin/dispositivos' && metodo === 'GET') {
-		return json({ ok: true, dispositivos: await listarDispositivos(env.DB) });
+		/*
+		 * A lista de painéis vai com os dispositivos, e não escrita na página.
+		 *
+		 * O `admin.html` é estático e não importa o `paineis.ts`; se tivesse a lista lá dentro,
+		 * ficavam **três** cópias — esta, a do Worker e a do `painel.html` — e a terceira seria a que
+		 * ninguém se lembrava de actualizar. Assim a página oferece o que o servidor aceita, que é a
+		 * mesma regra do dropdown dos núcleos: a lista de onde se escolhe e a validação da escolha
+		 * saem da mesma fonte, ou divergem.
+		 */
+		return json({
+			ok: true,
+			dispositivos: await listarDispositivos(env.DB),
+			paineis: PAINEIS,
+			painel_por_omissao: PAINEL_POR_OMISSAO,
+		});
+	}
+
+	/*
+	 * **Escrever configuração de um ecrã não é escrever o âmbito dele, e a diferença é toda.**
+	 *
+	 * A aprovação de um emparelhamento é a única rota destas apps que aceita um `company_id` num
+	 * corpo de pedido, e vale por ter as três cercas que estão escritas no `CLAUDE.md`. Esta rota
+	 * aceita dois campos, e **nenhum deles decide o que o ecrã pode ler**: o painel inicial escolhe
+	 * entre dados que aquele token já podia ver, e a etiqueta de local nunca sai do admin. O âmbito
+	 * continua a vir de onde vinha — do `company_id` da linha, escrito na recolha, a partir do
+	 * `SELECT` de dentro do SQL.
+	 *
+	 * Que fique dito para não haver analogia: **um campo que mudasse o núcleo de um dispositivo não
+	 * entrava aqui.** Trocar um ecrã de núcleo é revogá-lo e emparelhá-lo outra vez, que é o caminho
+	 * que deixa rasto nas duas linhas.
+	 */
+	if (caminho === '/api/admin/dispositivos/configurar' && metodo === 'POST') {
+		const corpo = await corpoJson(request);
+		const id = typeof corpo.id === 'string' && corpo.id.length > 0 && corpo.id.length <= 64 ? corpo.id : null;
+		if (!id) return erro(400, 'id_invalido');
+
+		const campos: { painel_inicial?: string | null; local?: string | null } = {};
+
+		if ('painel_inicial' in corpo) {
+			const painel = painelValido(corpo.painel_inicial);
+			if (painel === undefined) return erro(400, 'painel_invalido');
+			campos.painel_inicial = painel;
+		}
+
+		if ('local' in corpo) {
+			const local = localValido(corpo.local);
+			if (local === undefined) return erro(400, 'local_invalido');
+			campos.local = local;
+		}
+
+		const resultado = await configurarDispositivo(env.DB, id, campos);
+		if (resultado === 'inexistente') return erro(404, 'inexistente');
+		if (resultado === 'revogado') return erro(409, 'revogado');
+
+		/*
+		 * **O que se regista é que houve escrita, e não o que lá foi escrito.** A etiqueta é texto de
+		 * pessoas e pode trazer um nome sem ninguém querer; um log que a copiasse punha-a num sítio
+		 * que ninguém pensa em apagar. Fica se foi tocada, e o comprimento, que chega para perceber
+		 * o que se passou sem guardar o quê.
+		 */
+		console.warn({
+			evento: 'admin.dispositivo_configurado',
+			dispositivo: id,
+			painel_inicial: campos.painel_inicial ?? null,
+			local_tocado: 'local' in campos,
+			local_comprimento: campos.local?.length ?? 0,
+		});
+		return json({ ok: true });
 	}
 
 	if (caminho === '/api/admin/dispositivos/revogar' && metodo === 'POST') {

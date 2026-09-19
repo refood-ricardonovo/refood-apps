@@ -1220,6 +1220,32 @@
 			 * escondido não refresca: alternar com o OK é que o vai buscar.
 			 */
 			const ACTUALIZACAO_MS = 60_000;
+
+			/**
+			 * Quanto tempo um pedido tem para responder antes de se desistir dele.
+			 *
+			 * **Um `fetch` pendurado não rejeita nunca.** Não é o caso da rede em baixo — esse rejeita e
+			 * está tratado desde sempre. É o do wi-fi fraco de uma cozinha, do portal cativo, do proxy
+			 * que aceita a ligação e depois emudece: a promessa fica viva para sempre, e com ela fica
+			 * tudo o que a esperava. Foi assim que o arranque do painel quase ficou com um ecrã em
+			 * branco sem relógio e sem nova tentativa.
+			 *
+			 * Quinze segundos, porque o painel refresca de 60 em 60: uma leitura que demore mais do que
+			 * um quarto do intervalo já não serve para nada, e desistir dela deixa o ciclo seguinte
+			 * tentar com a rede que houver nessa altura. O ecrã não fica vazio à espera — fica com o
+			 * que tinha, que é o comportamento que já existia para a falta de rede.
+			 */
+			const PRAZO_DO_PEDIDO_MS = 15_000;
+
+			/**
+			 * E o prazo curto do arranque, que é outra coisa.
+			 *
+			 * O de cima é um limite de transporte: existe para uma ligação pendurada não pendurar o
+			 * resto. Este é um limite de **paciência**: a configuração do ecrã é dispensável, e esperar
+			 * quinze segundos por ela antes de desenhar o primeiro painel seria pagar por algo que se
+			 * resolve com uma tecla do comando. Quatro segundos, e segue-se.
+			 */
+			const PRAZO_DA_CONFIGURACAO_MS = 4000;
 			const RECUO_MS = 60_000;
 
 			/** Onde o ecrã está. Só muda por acção de quem carrega numa seta. */
@@ -1239,15 +1265,34 @@
 				el('aviso').hidden = !texto;
 			}
 
-			async function pedir(caminho) {
+			async function pedir(caminho, prazoMs = PRAZO_DO_PEDIDO_MS) {
 				const token = localStorage.getItem(TOKEN);
 				if (!token) return { estado: 'sem_token' };
 
+				/*
+				 * **`AbortController` à mão, e não `AbortSignal.timeout`.** O atalho só existe a partir
+				 * do Chrome 103, e estes ecrãs correm na WebView que a box tiver — que numa caixa barata
+				 * pode estar anos atrasada. Isto funciona em tudo o que tenha `fetch`.
+				 *
+				 * O temporizador é limpo no `finally`: sem isso ficava um `setTimeout` vivo por cada
+				 * pedido, e num ecrã que está ligado semanas isso conta.
+				 */
+				const travao = new AbortController();
+				const alarme = setTimeout(() => travao.abort(), prazoMs);
+
 				let resposta;
 				try {
-					resposta = await fetch(caminho, { headers: { authorization: `Bearer ${token}` } });
+					resposta = await fetch(caminho, { headers: { authorization: `Bearer ${token}` }, signal: travao.signal });
 				} catch {
-					return { estado: 'sem_rede' };
+					/*
+					 * Um pedido abortado e uma rede em baixo chegam aqui os dois, e **distinguem-se de
+					 * propósito**: para quem está a ver um televisor a falhar numa cozinha, "não há rede"
+					 * e "o servidor não respondeu a tempo" mandam procurar em sítios diferentes. O painel
+					 * trata os dois da mesma maneira; o que muda é a frase.
+					 */
+					return { estado: travao.signal.aborted ? 'sem_resposta' : 'sem_rede' };
+				} finally {
+					clearTimeout(alarme);
 				}
 
 				// Um 401 é o caminho de volta ao emparelhamento: o token foi revogado na sede, e
@@ -1789,7 +1834,48 @@
 				recolhas: { caminho: '/api/recolhas', outra: 'entregas', vazio: 'Sem recolhas neste turno.' },
 			};
 
+			/**
+			 * A área em que o ecrã está. Começa no painel por omissão e o comando alterna-a.
+			 *
+			 * **A escolha da sede só decide por onde se começa.** Quem está na cozinha carrega no OK e
+			 * vai para a outra, e isso não volta para a base: é uma preferência do momento, não
+			 * configuração. Um televisor que reinicie a meio da tarde volta ao painel inicial, e é o
+			 * que se quer — a escolha da sede é sobre a manhã seguinte, não sobre esta hora.
+			 */
 			let area = 'entregas';
+
+			/**
+			 * Lê a configuração deste ecrã e põe a área inicial no sítio antes do primeiro pedido.
+			 *
+			 * **Tolera tudo o que não reconhecer, e não é preguiça.** São 65 televisores que se
+			 * actualizam ao recarregar a página, cada um quando lhe calha: durante um lançamento há
+			 * versões diferentes ao mesmo tempo, e um ecrã antigo pode receber o nome de um painel que
+			 * ainda não sabe desenhar. Cair no painel por omissão é mostrar entregas; rebentar é
+			 * mostrar um ecrã preto numa cozinha.
+			 *
+			 * Sem rede também não insiste: o `carregar()` que vem a seguir trata da falta de rede, e
+			 * começar nas entregas é melhor do que não começar.
+			 */
+			async function escolherAreaInicial() {
+				/*
+				 * **Prazo curto, e não o dos outros pedidos.**
+				 *
+				 * Isto corre **antes** do `carregar` e do `ciclo`, e é a única coisa no arranque que os
+				 * segura. Os quinze segundos que chegam a uma leitura de dados são de mais aqui: são
+				 * quinze segundos de ecrã vazio à espera de uma configuração de que se pode perfeitamente
+				 * passar. Quatro, e segue-se — abrir no painel errado resolve-se com uma tecla do
+				 * comando, não abrir não tem cura.
+				 */
+				const resposta = await pedir('/api/ecra', PRAZO_DA_CONFIGURACAO_MS);
+				const escolhido = resposta.corpo?.ecra?.painel_inicial ?? null;
+				if (escolhido === null) return;
+
+				if (!Object.hasOwn(AREAS, escolhido)) {
+					console.warn(`[painel] painel inicial desconhecido: ${escolhido}. Fica em ${area}.`);
+					return;
+				}
+				area = escolhido;
+			}
 
 			function alternarArea() {
 				area = AREAS[area].outra;
@@ -1872,9 +1958,24 @@
 				setTimeout(ciclo, 1000);
 			}
 
-			mostrarNucleo();
-			carregar();
-			ciclo();
+			/**
+			 * O arranque, por ordem.
+			 *
+			 * A área inicial vem **antes** do primeiro `carregar()`, e essa ordem é a funcionalidade:
+			 * a correr em paralelo, o ecrã abria nas entregas e saltava para as recolhas um instante
+			 * depois, que numa cozinha se lê como avaria. Custa uma ida ao servidor no arranque, uma
+			 * vez por arranque, num ecrã que fica ligado semanas.
+			 *
+			 * O nome do núcleo não espera por ninguém: aparece quando chegar.
+			 */
+			async function arrancar() {
+				mostrarNucleo();
+				await escolherAreaInicial();
+				carregar();
+				ciclo();
+			}
+
+			arrancar();
 		</script>
 	</body>
 </html>

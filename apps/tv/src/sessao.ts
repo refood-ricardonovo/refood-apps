@@ -27,6 +27,18 @@ export interface EnvTv extends Partial<OdooEnv> {
 export interface SessaoTv {
 	readonly dispositivo: string;
 	readonly empresa: number;
+	/**
+	 * O painel com que este ecrã arranca, escolhido na sede. `null` quando ninguém escolheu.
+	 *
+	 * Vem da linha do dispositivo, como a empresa, e pela mesma razão: é propriedade de quem tem o
+	 * token, não de quem faz o pedido. Uma rota não o escolhe nem o pode trocar.
+	 *
+	 * **Não é validado aqui.** Quem valida é a rota do admin, na escrita. Na leitura tolera-se o que
+	 * a base tiver: durante uma actualização há televisores em versões diferentes ao mesmo tempo, e
+	 * um ecrã antigo que receba um painel que ainda não conhece tem de cair no painel por omissão em
+	 * vez de ficar preto.
+	 */
+	readonly painelInicial: string | null;
 }
 
 /**
@@ -319,15 +331,28 @@ export async function autenticarDispositivo(db: D1Database, request: Request): P
 	const token = cabecalho.startsWith('Bearer ') ? cabecalho.slice('Bearer '.length) : '';
 	if (token.length === 0 || token.length > 200) return { estado: 'sem_token' };
 
+	/*
+	 * **As colunas são escritas à mão, e a que falta é a que importa.**
+	 *
+	 * O `local` — a etiqueta que a sede escreve, "Cozinha", "Sala de convívio" — **não é lida
+	 * aqui**, e é essa a cerca. É texto livre escrito por pessoas, e nada impede que lá apareça o
+	 * nome de alguém; enquanto não entrar na sessão, nenhuma rota da TV o tem à mão para o pôr numa
+	 * resposta por distracção. Um `SELECT *` deitava a cerca abaixo sem ninguém dar por isso, e é
+	 * por isso que não há nenhum neste ficheiro.
+	 */
 	const linha = await db
-		.prepare('SELECT id, company_id, revogado, visto_em FROM dispositivos WHERE token_hash = ?')
+		.prepare('SELECT id, company_id, revogado, visto_em, painel_inicial FROM dispositivos WHERE token_hash = ?')
 		.bind(await sha256Hex(token))
-		.first<LinhaDispositivo>();
+		.first<LinhaDispositivo & { painel_inicial: string | null }>();
 
 	if (!linha) return { estado: 'desconhecido' };
 	if (linha.revogado !== 0) return { estado: 'revogado', dispositivo: linha.id };
 
-	return { estado: 'ok', sessao: { dispositivo: linha.id, empresa: linha.company_id }, visto_em: linha.visto_em };
+	return {
+		estado: 'ok',
+		sessao: { dispositivo: linha.id, empresa: linha.company_id, painelInicial: linha.painel_inicial ?? null },
+		visto_em: linha.visto_em,
+	};
 }
 
 /**

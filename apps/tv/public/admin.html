@@ -134,6 +134,46 @@
 				font-weight: var(--peso-enfase);
 			}
 
+			/*
+			 * O local, ao lado do ordinal e não em vez dele.
+			 *
+			 * Discreto de propósito: o identificador do ecrã continua a ser "núcleo · ecrã 2", que é
+			 * estável e não depende de ninguém ter escrito nada. Isto é a ajuda para quem tem dois no
+			 * mesmo núcleo e precisa de saber qual é o da cozinha.
+			 */
+			.local {
+				font-weight: var(--peso-corrente);
+				color: var(--n-600);
+			}
+
+			.local::before {
+				content: '— ';
+			}
+
+			/*
+			 * **Dois ecrãs do mesmo núcleo com a mesma etiqueta.**
+			 *
+			 * É o único caso em que a etiqueta deixa de servir para o que foi feita: duas "Cozinha" em
+			 * Leiria não desempatam nada, e quem revogar pelo rótulo revoga o errado. Não se recusa —
+			 * há a manhã em que se está a mudar um ecrã de sala e os dois nomes coincidem por umas
+			 * horas —, diz-se.
+			 */
+			.repetido {
+				color: var(--erro-escuro);
+				font-weight: var(--peso-enfase);
+			}
+
+			.pista-repetido {
+				color: var(--erro-escuro);
+				font-size: 13px;
+				width: 100%;
+			}
+
+			/* No editor a linha leva um dropdown, um campo e dois botões: precisa de espaço para crescer. */
+			.controlos input[type='text'] {
+				min-width: 220px;
+			}
+
 			.controlos {
 				display: flex;
 				gap: var(--e-2);
@@ -488,7 +528,7 @@
 					} else {
 						adiadoDesde = 0;
 						desenharPendentes(pendentes.corpo.pendentes ?? [], lista, forcar);
-						desenharDispositivos(dispositivos.corpo.dispositivos ?? [], lista);
+						desenharDispositivos(dispositivos.corpo ?? {}, lista);
 					}
 				} catch (falha) {
 					if (falha.message === 'nao_autorizado') return;
@@ -529,8 +569,22 @@
 				return entrada.escolha.value !== '' || document.activeElement === entrada.escolha;
 			}
 
-			/** Alguém está a mexer num dropdown? Dois sinais, e basta um. */
+			/**
+			 * O ecrã que está aberto em edição, se algum. Guarda o `id` e o cartão onde vive.
+			 *
+			 * Enquanto houver um, a actualização espera — pela mesma razão que espera por um dropdown
+			 * de núcleos: a lista refaz-se de dez em dez segundos e escrever "Sala de convívio" demora
+			 * mais do que isso. Ao contrário das linhas de pendentes, os cartões de dispositivos são
+			 * redesenhados de raiz a cada volta, e por isso aqui **não há reconciliação a proteger o
+			 * que está a meio**: é só a pausa. O tecto de dois minutos continua a valer, e ao fim dele
+			 * a edição perde-se — que é o preço de não deixar uma página congelada por alguém que
+			 * abriu um editor e foi almoçar.
+			 */
+			let editorAberto = null;
+
+			/** Alguém está a mexer num dropdown ou a editar um ecrã? Basta um sinal. */
 			function alguemAMexer() {
+				if (editorAberto !== null) return true;
 				if (Date.now() < interagidoAte) return true;
 
 				for (const entrada of linhasPendentes.values()) {
@@ -747,7 +801,7 @@
 			 * A lista de núcleos vem junto porque a etiqueta de cada ecrã precisa dela: no D1 não há
 			 * nome nenhum, o núcleo resolve-se contra o Odoo na altura de mostrar.
 			 */
-			let ultimosDispositivos = [];
+			let ultimosDispositivos = {};
 			let ultimaListaDeNucleos = [];
 
 			/**
@@ -761,9 +815,170 @@
 			 * Por isso o servidor continua a devolver tudo, com os ordinais já calculados, e o que
 			 * este filtro faz é não desenhar linhas.
 			 */
-			function desenharDispositivos(dispositivos, lista) {
-				ultimosDispositivos = dispositivos;
+			/** O tecto da etiqueta de local. O mesmo do `MAX_LOCAL` do Worker e do `CHECK` da 0005. */
+			const MAX_LOCAL = 30;
+
+			/**
+			 * A forma de uma etiqueta para comparar, **só para a pista que aparece enquanto se escreve**.
+			 *
+			 * Quem conta os repetidos a sério é o servidor, que tem as linhas todas e devolve
+			 * `local_repetido` em cada dispositivo — a mesma divisão do ordinal, que também não é
+			 * contado aqui. Isto existe porque a pista tem de reagir ao que ainda não foi gravado, e
+			 * para isso não há resposta do servidor nenhuma.
+			 *
+			 * É uma cópia da regra que está no `formaDoLocal` do `admin.ts`. Se as duas divergirem, o
+			 * que se perde é a pista ficar um pouco ao lado; **a marca no cartão continua certa**,
+			 * porque vem do servidor, e aparece no refresco logo a seguir a gravar.
+			 */
+			function formaDoLocal(texto) {
+				return (texto ?? '')
+					.normalize('NFD')
+					.replace(/\p{Diacritic}/gu, '')
+					.toLowerCase()
+					.trim();
+			}
+
+			/**
+			 * Abre o editor de um ecrã: o painel com que arranca e a etiqueta de local.
+			 *
+			 * Substitui os controlos do cartão em vez de abrir uma caixa de diálogo, para a edição
+			 * ficar ao lado da identificação do ecrã que se está a editar — numa lista de 65, uma
+			 * caixa flutuante perde o contexto que diz **qual** é o ecrã.
+			 *
+			 * Enquanto está aberto, o `editorAberto` segura a actualização. Fecha por Guardar ou
+			 * Cancelar, e em qualquer dos dois casos o `carregar(true)` que se segue redesenha a lista
+			 * do zero — forçado, porque o editor acabou de se fechar mas o `alguemAMexer` só sabe
+			 * disso depois de o `editorAberto` voltar a `null`.
+			 */
+			function abrirEditor(cartao, dispositivo, paineis, porOmissao, dispositivos) {
+				if (editorAberto !== null) return;
+				editorAberto = { id: dispositivo.id };
+
+				const controlos = cartao.querySelector('.controlos');
+				const anteriores = [...controlos.children];
+				for (const filho of anteriores) filho.remove();
+
+				const escolha = document.createElement('select');
+				const nenhum = document.createElement('option');
+				nenhum.value = '';
+				nenhum.textContent = porOmissao ? `Por omissão (${porOmissao})` : 'Por omissão';
+				escolha.append(nenhum);
+				for (const painel of paineis) {
+					const opcao = document.createElement('option');
+					opcao.value = painel;
+					opcao.textContent = painel;
+					escolha.append(opcao);
+				}
+				/*
+				 * Um painel guardado que esta versão da página não conheça não pode desaparecer do
+				 * dropdown em silêncio: quem gravasse a seguir estaria a apagá-lo sem saber. Entra como
+				 * opção própria, marcada.
+				 */
+				if (dispositivo.painel_inicial && !paineis.includes(dispositivo.painel_inicial)) {
+					const desconhecido = document.createElement('option');
+					desconhecido.value = dispositivo.painel_inicial;
+					desconhecido.textContent = `${dispositivo.painel_inicial} (desconhecido)`;
+					escolha.append(desconhecido);
+				}
+				escolha.value = dispositivo.painel_inicial ?? '';
+
+				const campo = document.createElement('input');
+				campo.type = 'text';
+				campo.maxLength = MAX_LOCAL;
+				campo.placeholder = 'Local (Cozinha, Sala de convívio…)';
+				campo.value = dispositivo.local ?? '';
+				campo.setAttribute('aria-label', 'Local do ecrã');
+
+				/*
+				 * **O aviso enquanto se escreve, e não só depois de gravar.**
+				 *
+				 * Os outros ecrãs vivos do mesmo núcleo, já na forma de comparação. O próprio fica de
+				 * fora — uma etiqueta não colide consigo mesma —, e os revogados também: aquele ecrã já
+				 * não está na parede.
+				 */
+				const vizinhos = dispositivos
+					.filter((d) => d.company_id === dispositivo.company_id && d.id !== dispositivo.id && !d.revogado && d.local)
+					.map((d) => formaDoLocal(d.local));
+
+				const pista = document.createElement('div');
+				pista.className = 'pista-repetido';
+				pista.hidden = true;
+
+				function verificarRepetido() {
+					const forma = formaDoLocal(campo.value);
+					const repete = forma !== '' && vizinhos.includes(forma);
+					pista.textContent = repete ? 'Já há um ecrã com esta etiqueta neste núcleo. Pode guardar à mesma.' : '';
+					pista.hidden = !repete;
+				}
+
+				campo.addEventListener('input', verificarRepetido);
+				verificarRepetido();
+
+				const guardar = document.createElement('button');
+				guardar.className = 'primaria';
+				guardar.textContent = 'Guardar';
+
+				const cancelar = document.createElement('button');
+				cancelar.textContent = 'Cancelar';
+
+				function fechar() {
+					editorAberto = null;
+					carregar(true);
+				}
+
+				cancelar.addEventListener('click', fechar);
+
+				guardar.addEventListener('click', async () => {
+					guardar.disabled = true;
+					cancelar.disabled = true;
+
+					const { estadoHttp, corpo } = await api('/api/admin/dispositivos/configurar', {
+						metodo: 'POST',
+						corpo: {
+							id: dispositivo.id,
+							painel_inicial: escolha.value === '' ? null : escolha.value,
+							local: campo.value.trim() === '' ? null : campo.value,
+						},
+					});
+
+					if (estadoHttp !== 200) {
+						guardar.disabled = false;
+						cancelar.disabled = false;
+						// O 409 tem causa própria e sabe-se dizer: alguém revogou o ecrã entretanto.
+						avisar(
+							estadoHttp === 409
+								? 'Este ecrã foi revogado entretanto e já não se configura.'
+								: corpo?.erro === 'local_invalido'
+									? `O local não serve: no máximo ${MAX_LOCAL} caracteres, numa linha só.`
+									: 'Não foi possível guardar.',
+						);
+						return;
+					}
+
+					avisar(null);
+					fechar();
+				});
+
+				controlos.append(escolha, campo, guardar, cancelar, pista);
+				campo.focus();
+			}
+
+			function desenharDispositivos(resposta, lista) {
+				const dispositivos = resposta.dispositivos ?? [];
+				// A lista de painéis vem do servidor — a mesma que ele aceita ao guardar. Ver a rota.
+				const paineis = resposta.paineis ?? [];
+				const porOmissao = resposta.painel_por_omissao ?? null;
+
+				ultimosDispositivos = resposta;
 				ultimaListaDeNucleos = lista;
+
+				/*
+				 * A partir daqui os cartões antigos deixam de existir, e com eles o editor que
+				 * estivesse aberto. Sem isto, o `editorAberto` ficava a apontar para um cartão fora do
+				 * documento e a pausa nunca mais levantava — a página parava de actualizar para sempre
+				 * por causa de um editor que já ninguém via.
+				 */
+				editorAberto = null;
 
 				const alvo = document.getElementById('dispositivos');
 				const verRevogados = document.getElementById('ver-revogados').checked;
@@ -803,13 +1018,37 @@
 					const identificacao = document.createElement('div');
 					const etiqueta = document.createElement('div');
 					etiqueta.className = 'etiqueta';
-					// A etiqueta é núcleo + ordinal. No D1 não há nome nenhum: o núcleo vem do Odoo e o
-					// número é a ordem de emparelhamento, contada também sobre os revogados.
+					/*
+					 * **Núcleo + ordinal, e o local a seguir quando existe.**
+					 *
+					 * O ordinal continua a ser o identificador: é estável, conta sobre as revogadas, e
+					 * não depende de ninguém se lembrar de escrever nada. O local **acrescenta-se** —
+					 * com dois ecrãs no mesmo núcleo, "ecrã 1" e "ecrã 2" não dizem qual é o da cozinha.
+					 *
+					 * Vai por `textContent` e nunca por interpolação em HTML: é texto escrito por
+					 * pessoas, e esta é a única página que o mostra.
+					 */
 					etiqueta.textContent = `${nomeDoNucleo(lista, dispositivo.company_id)} · ecrã ${dispositivo.ordinal}`;
+					if (dispositivo.local) {
+						const local = document.createElement('span');
+						local.className = 'local';
+						local.textContent = dispositivo.local;
+						etiqueta.append(' ', local);
+
+						if (dispositivo.local_repetido) {
+							const marca = document.createElement('span');
+							marca.className = 'repetido';
+							marca.textContent = '(repetido neste núcleo)';
+							etiqueta.append(' ', marca);
+						}
+					}
 
 					const meta = document.createElement('div');
 					meta.className = 'meta';
-					meta.textContent = `visto: ${desde(dispositivo.visto_em)}${dispositivo.versao ? ` · versão ${dispositivo.versao}` : ''}`;
+					const painelDito = dispositivo.painel_inicial ?? (porOmissao ? `${porOmissao} (por omissão)` : 'por omissão');
+					meta.textContent =
+						`abre em: ${painelDito} · visto: ${desde(dispositivo.visto_em)}` +
+						(dispositivo.versao ? ` · versão ${dispositivo.versao}` : '');
 					identificacao.append(etiqueta, meta);
 
 					const controlos = document.createElement('div');
@@ -823,6 +1062,11 @@
 						marca.textContent = dispositivo.revogado_em ? `Revogado ${desde(dispositivo.revogado_em)}` : 'Revogado';
 						controlos.append(marca);
 					} else {
+						const editar = document.createElement('button');
+						editar.textContent = 'Editar';
+						editar.addEventListener('click', () => abrirEditor(cartao, dispositivo, paineis, porOmissao, dispositivos));
+						controlos.append(editar);
+
 						const revogar = document.createElement('button');
 						revogar.className = 'perigo';
 						revogar.textContent = 'Revogar';

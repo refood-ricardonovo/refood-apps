@@ -1,7 +1,7 @@
 import { rotaAdmin } from './admin';
 import { rotaEstadoEmparelhamento, rotaIniciarEmparelhamento, rotaRecolherToken } from './emparelhamento';
 import { rotaEntregas } from './entregas';
-import { rotaNucleo, rotaSinal } from './nucleo';
+import { rotaEcra, rotaNucleo, rotaSinal } from './nucleo';
 import { rotaRecolhas } from './recolhas';
 import { servirRotaTv, type RotaTv } from './sessao';
 
@@ -20,6 +20,7 @@ const EMPARELHAMENTO: Record<string, (request: Request, env: Env) => Promise<Res
  */
 const TV: Record<string, { metodo: string; rota: RotaTv }> = {
 	'/api/nucleo': { metodo: 'GET', rota: rotaNucleo },
+	'/api/ecra': { metodo: 'GET', rota: rotaEcra },
 	'/api/sinal': { metodo: 'POST', rota: rotaSinal },
 	'/api/entregas': { metodo: 'GET', rota: rotaEntregas },
 	'/api/recolhas': { metodo: 'GET', rota: rotaRecolhas },
