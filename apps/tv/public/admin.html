@@ -527,6 +527,12 @@
 						if (adiadoDesde === 0) adiadoDesde = Date.now();
 					} else {
 						adiadoDesde = 0;
+
+						// Antes de desenhar seja o que for: a linha de aprovação precisa da lista de
+						// painéis, e ela vem na resposta dos dispositivos.
+						paineisDisponiveis = dispositivos.corpo?.paineis ?? paineisDisponiveis;
+						painelPorOmissao = dispositivos.corpo?.painel_por_omissao ?? painelPorOmissao;
+
 						desenharPendentes(pendentes.corpo.pendentes ?? [], lista, forcar);
 						desenharDispositivos(dispositivos.corpo ?? {}, lista);
 					}
@@ -564,9 +570,17 @@
 			const JANELA_INTERACCAO_MS = 30 * 1000;
 			let interagidoAte = 0;
 
-			/** Uma linha está em uso se tem núcleo escolhido ou se o dropdown está focado. */
+			/**
+			 * Uma linha de pendente está em uso se alguém lhe começou alguma coisa.
+			 *
+			 * **São três campos e não um.** Era só o núcleo, porque era só o que havia; com o painel e o
+			 * local ao lado, olhar apenas para o núcleo deitava fora uma etiqueta escrita com cuidado só
+			 * porque a pessoa ainda não tinha chegado ao dropdown. Vale o foco em qualquer um deles e
+			 * vale qualquer um deles ter conteúdo.
+			 */
 			function emUso(entrada) {
-				return entrada.escolha.value !== '' || document.activeElement === entrada.escolha;
+				const campos = [entrada.escolha, entrada.painel, entrada.local];
+				return campos.some((campo) => campo.value !== '' || document.activeElement === campo);
 			}
 
 			/**
@@ -588,7 +602,9 @@
 				if (Date.now() < interagidoAte) return true;
 
 				for (const entrada of linhasPendentes.values()) {
-					if (document.activeElement === entrada.escolha) return true;
+					for (const campo of [entrada.escolha, entrada.painel, entrada.local]) {
+						if (document.activeElement === campo) return true;
+					}
 				}
 				return false;
 			}
@@ -603,7 +619,11 @@
 				const entrada = linhasPendentes.get(codigo);
 				if (!entrada) return;
 
+				// Os três, e não só o núcleo: enquanto qualquer um tiver valor, a linha conta como em uso
+				// e a reconciliação seguinte tratava-a como uma escolha a proteger.
 				entrada.escolha.value = '';
+				entrada.painel.value = '';
+				entrada.local.value = '';
 				entrada.cartao.remove();
 				linhasPendentes.delete(codigo);
 			}
@@ -663,6 +683,32 @@
 					escolha.append(opcao);
 				}
 
+				/*
+				 * **O painel e o local escrevem-se aqui, na aprovação, e não depois na lista.**
+				 *
+				 * Quem aprova está ao telefone com quem instala, que está à frente do ecrã: é o único
+				 * momento em que alguém sabe que aquele é o da cozinha. Continuam editáveis na lista de
+				 * ecrãs — isto é o ponto de partida, não a única oportunidade.
+				 */
+				const painel = document.createElement('select');
+				painel.setAttribute('aria-label', `Painel inicial para o código ${pendente.codigo}`);
+				const porOmissaoOpcao = document.createElement('option');
+				porOmissaoOpcao.value = '';
+				porOmissaoOpcao.textContent = painelPorOmissao ? `Abre em ${painelPorOmissao}` : 'Painel por omissão';
+				painel.append(porOmissaoOpcao);
+				for (const nome of paineisDisponiveis) {
+					const opcao = document.createElement('option');
+					opcao.value = nome;
+					opcao.textContent = `Abre em ${nome}`;
+					painel.append(opcao);
+				}
+
+				const local = document.createElement('input');
+				local.type = 'text';
+				local.maxLength = MAX_LOCAL;
+				local.placeholder = 'Local (opcional)';
+				local.setAttribute('aria-label', `Local do ecrã do código ${pendente.codigo}`);
+
 				const aprovar = document.createElement('button');
 				aprovar.className = 'primaria';
 				aprovar.textContent = 'Aprovar';
@@ -670,6 +716,8 @@
 				// Sem núcleos não há nada para escolher: o botão fica desligado, e a queixa que
 				// explica porquê está no aviso, em cima.
 				escolha.disabled = !lista;
+				painel.disabled = !lista;
+				local.disabled = !lista;
 				aprovar.disabled = !lista;
 
 				// Carregar ou escrever no campo abre a janela de interacção, que é o sinal que não depende
@@ -677,6 +725,16 @@
 				const aMexer = () => (interagidoAte = Date.now() + JANELA_INTERACCAO_MS);
 				escolha.addEventListener('pointerdown', aMexer);
 				escolha.addEventListener('keydown', aMexer);
+				/*
+				 * Os campos novos abrem a mesma janela. Sem isto, escrever "Sala de convívio" com calma
+				 * apanhava uma actualização a meio e perdia o que já lá estava — que é exactamente o
+				 * defeito que toda esta reconciliação existe para evitar, a reaparecer num campo novo.
+				 */
+				for (const campo of [painel, local]) {
+					campo.addEventListener('pointerdown', aMexer);
+					campo.addEventListener('keydown', aMexer);
+					campo.addEventListener('input', aMexer);
+				}
 
 				// Escolhido o núcleo, a janela fecha-se: a linha passa a estar protegida por ter valor.
 				escolha.addEventListener('change', () => (interagidoAte = 0));
@@ -697,7 +755,12 @@
 					aprovar.disabled = true;
 					const { estadoHttp, corpo } = await api('/api/admin/emparelhamentos/aprovar', {
 						metodo: 'POST',
-						corpo: { codigo: pendente.codigo, company_id: Number(escolha.value) },
+						corpo: {
+							codigo: pendente.codigo,
+							company_id: Number(escolha.value),
+							painel_inicial: painel.value === '' ? null : painel.value,
+							local: local.value.trim() === '' ? null : local.value,
+						},
 					});
 
 					if (estadoHttp !== 200) {
@@ -723,10 +786,10 @@
 					carregar();
 				});
 
-				controlos.append(escolha, aprovar);
+				controlos.append(escolha, painel, local, aprovar);
 				cartao.append(identificacao, controlos);
 
-				return { cartao, escolha, aprovar, prazo, comLista: !!lista, expirada: false };
+				return { cartao, escolha, painel, local, aprovar, prazo, comLista: !!lista, expirada: false };
 			}
 
 			/**
@@ -817,6 +880,20 @@
 			 */
 			/** O tecto da etiqueta de local. O mesmo do `MAX_LOCAL` do Worker e do `CHECK` da 0005. */
 			const MAX_LOCAL = 30;
+
+			/**
+			 * Os painéis que o servidor aceita, e qual deles é o por omissão.
+			 *
+			 * **Vêm com a listagem dos dispositivos, e não escritos aqui.** É a mesma regra do dropdown
+			 * dos núcleos: a lista de onde se escolhe e a validação da escolha saem da mesma fonte, ou
+			 * divergem. Ficam ao nível da página porque são precisos nos dois sítios — na aprovação de
+			 * um pendente e na edição de um ecrã — e a listagem chega uma vez por volta.
+			 *
+			 * Vazios até à primeira resposta: nesse intervalo o dropdown do painel tem só o "por
+			 * omissão", que é a escolha certa quando ainda não se sabe que outras há.
+			 */
+			let paineisDisponiveis = [];
+			let painelPorOmissao = null;
 
 			/**
 			 * A forma de uma etiqueta para comparar, **só para a pista que aparece enquanto se escreve**.

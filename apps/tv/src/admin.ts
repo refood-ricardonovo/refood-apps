@@ -251,20 +251,44 @@ export async function listarPendentes(db: D1Database, agora: Date): Promise<Pend
 }
 
 /**
- * Aprova um emparelhamento pendente e atribui-lhe o núcleo escolhido.
+ * Aprova um emparelhamento pendente, atribui-lhe o núcleo escolhido e guarda a configuração do ecrã.
  *
  * O `WHERE` repete o estado e o prazo: entre a listagem e o clique podem ter passado minutos, e um
  * emparelhamento que caducou nesse intervalo não se aprova. A aprovação **não estica a validade** —
  * `expira_em` fica como estava, e um aprovado que ninguém recolha caduca como qualquer outro.
+ *
+ * **O painel e o local são escritos aqui, e não depois**, porque é aqui que se sabem: quem aprova
+ * está ao telefone com quem instala, que está à frente do ecrã. As duas colunas ficam no
+ * emparelhamento e a recolha copia-as para o dispositivo, pelo mesmo `SELECT` que já copia o
+ * núcleo. Ficam na mesma editáveis na lista de ecrãs — o que se escreve aqui é um ponto de partida,
+ * não uma coisa que só se possa dizer uma vez.
+ *
+ * Escritos sempre, mesmo quando vêm vazios: um `UPDATE` que só tocasse nas colunas presentes seria
+ * SQL construído à mão num caminho que já é delicado, e aqui não há o que preservar — a linha
+ * acabou de sair de `pendente` e nunca teve configuração nenhuma.
  */
-export async function aprovarEmparelhamento(db: D1Database, codigo: string, empresa: number, agora: Date): Promise<boolean> {
+export async function aprovarEmparelhamento(
+	db: D1Database,
+	codigo: string,
+	empresa: number,
+	agora: Date,
+	configuracao: { painel_inicial?: string | null; local?: string | null } = {},
+): Promise<boolean> {
 	const instante = agora.toISOString();
 	const resultado = await db
 		.prepare(
-			`UPDATE emparelhamentos SET estado = ?, company_id = ?, aprovado_em = ?
+			`UPDATE emparelhamentos SET estado = ?, company_id = ?, aprovado_em = ?, painel_inicial = ?, local = ?
 			 WHERE codigo = ? AND estado = 'pendente' AND expira_em > ?`,
 		)
-		.bind(transition('pendente', 'aprovado'), empresa, instante, codigo, instante)
+		.bind(
+			transition('pendente', 'aprovado'),
+			empresa,
+			instante,
+			configuracao.painel_inicial ?? null,
+			configuracao.local ?? null,
+			codigo,
+			instante,
+		)
 		.run();
 
 	return resultado.meta.changes === 1;
@@ -627,12 +651,42 @@ export async function rotaAdmin(request: Request, env: EnvAdmin, agora = new Dat
 		}
 		if (!nucleos.some((nucleo) => nucleo.id === empresa)) return erro(400, 'nucleo_desconhecido');
 
-		if (!(await aprovarEmparelhamento(env.DB, codigo, empresa, agora))) {
+		/*
+		 * **A configuração do ecrã entra aqui, e não fura a cerca desta rota.**
+		 *
+		 * Esta é a única rota das duas apps que aceita um `company_id` do corpo do pedido, e vale por
+		 * ter as três cercas que o `CLAUDE.md` descreve. Os dois campos que se lhe juntam agora **não
+		 * são âmbito**: o painel escolhe entre dados que aquele ecrã vai poder ver de qualquer
+		 * maneira, e a etiqueta nunca sai do admin. O que decide o que o ecrã lê continua a ser só o
+		 * `company_id`, com as mesmas três cercas à frente.
+		 */
+		const configuracao: { painel_inicial?: string | null; local?: string | null } = {};
+
+		if ('painel_inicial' in corpo) {
+			const painel = painelValido(corpo.painel_inicial);
+			if (painel === undefined) return erro(400, 'painel_invalido');
+			configuracao.painel_inicial = painel;
+		}
+
+		if ('local' in corpo) {
+			const local = localValido(corpo.local);
+			if (local === undefined) return erro(400, 'local_invalido');
+			configuracao.local = local;
+		}
+
+		if (!(await aprovarEmparelhamento(env.DB, codigo, empresa, agora, configuracao))) {
 			// Ou já não está pendente, ou caducou entre a listagem e o clique.
 			return erro(409, 'nao_aprovavel');
 		}
 
-		console.warn({ evento: 'admin.emparelhamento_aprovado', codigo, company_id: empresa });
+		// O `local` não entra no log: é texto de pessoas e pode trazer um nome sem ninguém querer.
+		console.warn({
+			evento: 'admin.emparelhamento_aprovado',
+			codigo,
+			company_id: empresa,
+			painel_inicial: configuracao.painel_inicial ?? null,
+			local_comprimento: configuracao.local?.length ?? 0,
+		});
 		return json({ ok: true });
 	}
 

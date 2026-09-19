@@ -176,6 +176,12 @@ export async function codigoExiste(db: D1Database, codigo: string): Promise<bool
  *
  * O `company_id` do dispositivo vem do `SELECT` sobre o emparelhamento, dentro do SQL. Não passa
  * pelo pedido nem pelo JavaScript, e por isso não há por onde um cliente o sugerir.
+ *
+ * **O `painel_inicial` e o `local` vêm pelo mesmo caminho**, e é de propósito que vêm assim: são
+ * três colunas copiadas pelo mesmo `SELECT`, no mesmo instante, sob a mesma condição. Acrescentá-los
+ * não mexeu na atomicidade — continua a não haver leitura antes da escrita — e não abriu caminho
+ * nenhum para o cliente os sugerir, porque a TV não fala nisto: quem os escreveu foi a sede, na
+ * aprovação, e estão na linha do emparelhamento muito antes de a TV chegar aqui.
  */
 export async function recolherToken(db: D1Database, linha: EmparelhamentoDb, agora: Date): Promise<string | null> {
 	// Rebenta se a linha não estiver num estado que permita recolher: a tabela de transições do
@@ -190,8 +196,8 @@ export async function recolherToken(db: D1Database, linha: EmparelhamentoDb, ago
 	const [, actualizacao] = await db.batch([
 		db
 			.prepare(
-				`INSERT INTO dispositivos (id, token_hash, company_id, criado_em)
-				 SELECT ?, ?, company_id, ? FROM emparelhamentos WHERE id = ? AND estado = ? AND expira_em > ?`,
+				`INSERT INTO dispositivos (id, token_hash, company_id, criado_em, painel_inicial, local)
+				 SELECT ?, ?, company_id, ?, painel_inicial, local FROM emparelhamentos WHERE id = ? AND estado = ? AND expira_em > ?`,
 			)
 			.bind(dispositivoId, tokenHash, instante, linha.id, linha.estado, instante),
 		db

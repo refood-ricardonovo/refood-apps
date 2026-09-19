@@ -1,8 +1,19 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { configurarDispositivo, formaDoLocal, listarDispositivos, localValido, MAX_LOCAL, rotaAdmin, type EnvAdmin } from '../src/admin';
+import { OdooClient } from '@refood/odoo';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+	aprovarEmparelhamento,
+	configurarDispositivo,
+	formaDoLocal,
+	listarDispositivos,
+	localValido,
+	MAX_LOCAL,
+	rotaAdmin,
+	type EnvAdmin,
+} from '../src/admin';
+import { recolherToken, type EmparelhamentoDb } from '../src/emparelhamento';
 import { sha256Hex } from '../src/auth';
 import { autenticarDispositivo } from '../src/sessao';
 import { PAINEIS, PAINEL_POR_OMISSAO, painelValido } from '../src/paineis';
@@ -27,8 +38,22 @@ let env: EnvAdmin;
 
 beforeEach(async () => {
 	db = novaBase();
-	env = { DB: db, ADMIN_SECRET: SEGREDO_ADMIN };
+	env = { DB: db, ADMIN_SECRET: SEGREDO_ADMIN, ODOO_URL: 'https://odoo.test', ODOO_DB: 't', ODOO_USERNAME: 'u', ODOO_PASSWORD: 'p' };
 	await semearDispositivo('dis-1', 7);
+
+	/*
+	 * O unico ponto de contacto com o Odoo nestas rotas: o utilizador, que diz quais sao as
+	 * empresas permitidas, e as empresas. Mesma substituicao do `admin.test.ts`.
+	 */
+	vi.spyOn(OdooClient.prototype, 'searchRead').mockImplementation(async (modelo) => {
+		if (modelo === 'res.users') return [{ id: 36, company_ids: [7, 12] }] as never;
+		return [{ id: 7, name: 'Refood Leiria', center_prefix: 'LRA' }] as never;
+	});
+	vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+
+afterEach(() => {
+	vi.restoreAllMocks();
 });
 
 async function semearDispositivo(id: string, empresa: number, criado_em = '2026-09-01T09:00:00.000Z') {
@@ -312,6 +337,73 @@ describe('locais repetidos no mesmo núcleo', () => {
 	it('o normalizador tira acentos e maiúsculas, e apara', () => {
 		expect(formaDoLocal('  Sala de Convívio ')).toBe('sala de convivio');
 		expect(formaDoLocal(null)).toBe('');
+	});
+});
+
+/**
+ * **A configuração escolhida na aprovação chega ao dispositivo.**
+ *
+ * Quem aprova está ao telefone com quem instala, e é o único momento em que alguém sabe que aquele
+ * ecrã é o da cozinha. As duas colunas ficam no emparelhamento (migração `0006`) e a recolha
+ * copia-as para o dispositivo — pelo mesmo `SELECT` que já copiava o núcleo, sem tocar na escrita
+ * atómica.
+ */
+describe('da aprovação até ao dispositivo', () => {
+	async function semearPendente(codigo: string) {
+		await db
+			.prepare("INSERT INTO emparelhamentos (id, codigo, segredo_hash, estado, criado_em, expira_em) VALUES (?, ?, ?, 'pendente', ?, ?)")
+			.bind(`emp-${codigo}`, codigo, await sha256Hex(`seg_${codigo}`), AGORA.toISOString(), '2026-09-05T10:15:00.000Z')
+			.run();
+	}
+
+	/** A linha como o `recolherToken` a espera depois de aprovada. */
+	function aprovado(codigo: string): EmparelhamentoDb {
+		return { id: `emp-${codigo}`, codigo, estado: 'aprovado', company_id: 7, expira_em: '2026-09-05T10:15:00.000Z' } as EmparelhamentoDb;
+	}
+
+	it('o painel e o local viajam da aprovação para o dispositivo', async () => {
+		await semearPendente('111111');
+
+		expect(await aprovarEmparelhamento(db, '111111', 7, AGORA, { painel_inicial: 'recolhas', local: 'Cozinha' })).toBe(true);
+
+		const token = await recolherToken(db, aprovado('111111'), AGORA);
+		expect(token).not.toBeNull();
+
+		const linha = await db
+			.prepare("SELECT company_id, painel_inicial, local FROM dispositivos WHERE id <> 'dis-1'")
+			.first<{ company_id: number; painel_inicial: string | null; local: string | null }>();
+
+		expect(linha).toEqual({ company_id: 7, painel_inicial: 'recolhas', local: 'Cozinha' });
+	});
+
+	/* Aprovar sem escrever nada continua a funcionar: os dois campos são opcionais. */
+	it('sem configuração o dispositivo nasce com os dois a null', async () => {
+		await semearPendente('222222');
+		await aprovarEmparelhamento(db, '222222', 7, AGORA);
+		await recolherToken(db, aprovado('222222'), AGORA);
+
+		const linha = await db
+			.prepare("SELECT painel_inicial, local FROM dispositivos WHERE id <> 'dis-1'")
+			.first<{ painel_inicial: string | null; local: string | null }>();
+
+		expect(linha).toEqual({ painel_inicial: null, local: null });
+	});
+
+	it('a rota valida o painel e o local antes de aprovar', async () => {
+		await semearPendente('333333');
+
+		const resposta = await rotaAdmin(
+			pedido('/api/admin/emparelhamentos/aprovar', { codigo: '333333', company_id: 7, local: 'Cozinha\nSala' }),
+			env,
+			AGORA,
+		);
+
+		expect(resposta.status).toBe(400);
+		expect(await resposta.json()).toMatchObject({ erro: 'local_invalido' });
+
+		// E não aprovou: a linha continua pendente, sem núcleo.
+		const linha = await db.prepare("SELECT estado, company_id FROM emparelhamentos WHERE codigo = '333333'").first();
+		expect(linha).toMatchObject({ estado: 'pendente', company_id: null });
 	});
 });
 
