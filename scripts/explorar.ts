@@ -16,34 +16,9 @@
  * no domínio e `allowed_company_ids` no contexto.
  */
 
-import { readFileSync } from 'node:fs';
-import { registerHooks } from 'node:module';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { OdooDomain, OdooMany2One, OdooRecord } from '@refood/odoo';
 
-/**
- * O `@refood/odoo` é distribuído como TypeScript e importa-se por dentro sem extensão (`./client`),
- * porque quem o compila é o esbuild do Wrangler. O resolvedor de ESM do Node exige a extensão, por
- * isso completa-se aqui: quando um caminho relativo não existe, tenta-se o mesmo com `.ts`.
- * O import do pacote tem de ser dinâmico, para só acontecer depois do hook estar registado.
- */
-registerHooks({
-	resolve(especificador, contexto, seguinte) {
-		try {
-			return seguinte(especificador, contexto);
-		} catch (erro) {
-			if (!especificador.startsWith('.') || (erro as NodeJS.ErrnoException).code !== 'ERR_MODULE_NOT_FOUND') throw erro;
-			return seguinte(`${especificador}.ts`, contexto);
-		}
-	},
-});
-
-const { createOdooClient, many2one } = await import('@refood/odoo');
-
-const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DEV_VARS = resolve(RAIZ, 'apps/tv/.dev.vars');
-const WRANGLER = resolve(RAIZ, 'apps/tv/wrangler.jsonc');
+import { carregarEnv, createOdooClient, many2one } from './ligacao.ts';
 
 /** Atributos pedidos ao `fields_get`. O default do cliente não traz `relation`, que é meia informação num many2one. */
 const ATRIBUTOS = ['string', 'type', 'required', 'readonly', 'store', 'relation', 'selection'] as const;
@@ -52,91 +27,6 @@ const ATRIBUTOS = ['string', 'type', 'required', 'readonly', 'store', 'relation'
 const TIPOS_VOLUMOSOS = new Set(['binary', 'image', 'html']);
 
 const LARGURA_VALOR = 100;
-
-// ---------------------------------------------------------------------------
-// Configuração
-// ---------------------------------------------------------------------------
-
-/** Lê um ficheiro `CHAVE=valor` no formato do `.dev.vars`. Ficheiro ausente não é erro — pode vir tudo do ambiente. */
-function lerDevVars(caminho: string): Record<string, string> {
-	let conteudo: string;
-	try {
-		conteudo = readFileSync(caminho, 'utf8');
-	} catch {
-		return {};
-	}
-
-	const vars: Record<string, string> = {};
-	for (const linha of conteudo.split(/\r?\n/)) {
-		const limpa = linha.trim();
-		if (!limpa || limpa.startsWith('#')) continue;
-
-		const igual = limpa.indexOf('=');
-		if (igual === -1) continue;
-
-		const chave = limpa.slice(0, igual).trim();
-		const valor = limpa.slice(igual + 1).trim();
-		vars[chave] = valor.replace(/^(['"])([\s\S]*)\1$/, '$2');
-	}
-	return vars;
-}
-
-/**
- * Remove comentários de JSONC, ignorando os que estão dentro de strings — senão o `//` de
- * `"https://staging.onrefood.com"` levava metade do valor à frente.
- */
-function despirJsonc(texto: string): string {
-	let saida = '';
-	let emString = false;
-	let escapado = false;
-
-	for (let i = 0; i < texto.length; i++) {
-		const c = texto[i] as string;
-
-		if (emString) {
-			saida += c;
-			if (escapado) escapado = false;
-			else if (c === '\\') escapado = true;
-			else if (c === '"') emString = false;
-			continue;
-		}
-
-		if (c === '"') {
-			emString = true;
-			saida += c;
-		} else if (c === '/' && texto[i + 1] === '/') {
-			while (i < texto.length && texto[i] !== '\n') i++;
-			saida += '\n';
-		} else if (c === '/' && texto[i + 1] === '*') {
-			i += 2;
-			while (i < texto.length && !(texto[i] === '*' && texto[i + 1] === '/')) i++;
-			i++;
-		} else {
-			saida += c;
-		}
-	}
-	return saida;
-}
-
-/** `ODOO_URL` e `ODOO_DB` vivem nas `vars` do wrangler.jsonc; só as credenciais é que são secrets. */
-function lerVarsWrangler(caminho: string): Record<string, string> {
-	try {
-		const config = JSON.parse(despirJsonc(readFileSync(caminho, 'utf8'))) as { vars?: Record<string, string> };
-		return config.vars ?? {};
-	} catch {
-		return {};
-	}
-}
-
-/** Ambiente para o cliente, por precedência crescente: wrangler.jsonc, .dev.vars, variáveis de ambiente. */
-function carregarEnv(): Record<string, string | undefined> {
-	const doAmbiente: Record<string, string> = {};
-	for (const chave of ['ODOO_URL', 'ODOO_DB', 'ODOO_USERNAME', 'ODOO_PASSWORD'] as const) {
-		const valor = process.env[chave];
-		if (valor) doAmbiente[chave] = valor;
-	}
-	return { ...lerVarsWrangler(WRANGLER), ...lerDevVars(DEV_VARS), ...doAmbiente };
-}
 
 // ---------------------------------------------------------------------------
 // Argumentos
