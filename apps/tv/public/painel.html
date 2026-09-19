@@ -27,12 +27,55 @@
 				margin: 0;
 			}
 
+			/*
+			 * ---------------------------------------------------------------- a unidade
+			 *
+			 * **Nenhuma medida deste ficheiro é um píxel do browser. Todas são uma fracção do ecrã.**
+			 *
+			 * Este painel foi desenhado contra 1920 × 1080 e escrito em píxeis absolutos, o que
+			 * parecia a mesma coisa e não é. O televisor do levantamento reporta **960 × 540 px CSS
+			 * com `devicePixelRatio: 2`** — 1920 × 1080 físicos contados em metade, que é a densidade
+			 * normal de uma Android TV, onde 1 px CSS = 1 dp = 2 px do painel. Não é defeito nem
+			 * overscan. Mas com o desenho em píxeis absolutos, tudo saía ao dobro do tamanho previsto
+			 * e cabia um quinto dos cartões; os restantes eram cortados em silêncio.
+			 *
+			 * O `--px` é o antídoto: **um píxel do desenho**, valendo a milésima parte de 1920 da
+			 * largura — ou de 1080 da altura, o que for menor, para um ecrã que não seja 16:9 encolher
+			 * em vez de cortar. A 1920 px CSS vale 1; a 960 vale 0,5; num 4K que reporte 3840 vale 2.
+			 * Em todos, **o resultado no vidro é o mesmo**, que é o que a legibilidade a três metros
+			 * pede: o que importa não é o número de píxeis de uma letra, é a fracção do ecrã que ela
+			 * ocupa.
+			 *
+			 * Daí a regra, que não tem excepções neste ficheiro: **um valor em `px` aqui é um erro.**
+			 * Escreve-se `calc(40 * var(--px))`, não `40px`. Vale para bordas e para raios de canto
+			 * como vale para corpos de letra — uma borda que não encolha com o resto engorda ao dobro
+			 * no televisor, e nota-se.
+			 *
+			 * **Os tokens de espaço são reexpressos aqui, e não no `tokens.css`.** Aquele ficheiro é
+			 * partilhado com a PWA, que corre num telemóvel e não quer nada disto; a escala é uma
+			 * propriedade desta página, não da marca. Os nomes e os valores são os mesmos do
+			 * `design.md` — muda a unidade, não o sistema.
+			 */
+			:root {
+				--px: min(calc(100vw / 1920), calc(100vh / 1080));
+
+				--e-1: calc(4 * var(--px));
+				--e-2: calc(8 * var(--px));
+				--e-3: calc(12 * var(--px));
+				--e-4: calc(16 * var(--px));
+				--e-6: calc(24 * var(--px));
+				--e-8: calc(32 * var(--px));
+				--e-12: calc(48 * var(--px));
+				--e-16: calc(64 * var(--px));
+				--e-24: calc(96 * var(--px));
+			}
+
 			body {
 				background: var(--n-950);
 				color: var(--n-000);
 				font-family: var(--fonte);
 				font-weight: 500; /* sobre fundo escuro, o 400 esvai-se a três metros */
-				font-size: 40px;
+				font-size: calc(40 * var(--px));
 				line-height: 1.2;
 				height: 100vh;
 				overflow: hidden;
@@ -65,7 +108,7 @@
 			 * rouba uma linha de cartões, que são dez famílias fora do ecrã sem aviso.
 			 */
 			header {
-				height: 132px;
+				height: calc(132 * var(--px));
 				overflow: hidden;
 				display: grid;
 				grid-template-columns: auto minmax(0, 1fr) auto auto;
@@ -74,7 +117,7 @@
 				align-items: center;
 				column-gap: var(--e-6);
 				row-gap: var(--e-1);
-				border-bottom: 2px solid var(--n-800);
+				border-bottom: calc(2 * var(--px)) solid var(--n-800);
 			}
 
 			/*
@@ -99,7 +142,7 @@
 			.logotipo {
 				grid-column: 1;
 				grid-row: 1 / -1;
-				height: 96px;
+				height: calc(96 * var(--px));
 				width: auto;
 				margin-right: var(--e-4);
 			}
@@ -135,7 +178,7 @@
 			}
 
 			.dia {
-				font-size: 56px;
+				font-size: calc(56 * var(--px));
 				font-weight: var(--peso-destaque);
 			}
 
@@ -146,13 +189,13 @@
 
 			/* A relação com hoje é o que impede alguém de ler o ecrã de amanhã como se fosse o de hoje. */
 			.relacao {
-				font-size: 36px;
+				font-size: calc(36 * var(--px));
 				color: var(--marca-amarelo); /* amarelo sobre escuro: 11,7:1, o acento mais forte que a marca permite */
 				font-weight: var(--peso-enfase);
 			}
 
 			.contagens {
-				font-size: 32px;
+				font-size: calc(32 * var(--px));
 				color: var(--n-400);
 				display: flex;
 				gap: var(--e-6);
@@ -187,6 +230,26 @@
 			 */
 			.contagens .fora-de-escala {
 				color: var(--info-claro);
+			}
+
+			/*
+			 * **O contador de cartões que não cabem no ecrã. Este é vermelho, e a diferença importa.**
+			 *
+			 * O `fora de escala` ao lado é azul de propósito: é um registo estranho no Odoo, não um
+			 * defeito desta app. Este é ao contrário. Se ele aparecer, **o painel está a falhar
+			 * naquilo para que existe** — houve famílias que vieram do servidor e não estão em lado
+			 * nenhum do ecrã, e quem está na cozinha não tem como saber.
+			 *
+			 * Existe porque a alternativa já aconteceu: o degrau mais denso estava dimensionado para
+			 * 90 famílias, que era uma contagem de antes de o painel deixar de desenhar fichas
+			 * arquivadas. Enquanto esse número esteve velho, um turno maior do que o previsto perdia
+			 * cartões em silêncio — sem aviso, sem barra de deslocamento, sem nada. Os números de hoje
+			 * dizem que não chega lá; os números de ontem também diziam.
+			 *
+			 * **Não é para o caso normal. É para quando a medição voltar a ficar velha.**
+			 */
+			.contagens .fora-do-ecra {
+				color: var(--erro-claro);
 			}
 
 			/*
@@ -231,7 +294,7 @@
 			}
 
 			.turno-nome {
-				font-size: 26px;
+				font-size: calc(26 * var(--px));
 				color: var(--n-600);
 				overflow: hidden;
 				text-overflow: ellipsis;
@@ -239,7 +302,7 @@
 			}
 
 			.nucleo {
-				font-size: 32px;
+				font-size: calc(32 * var(--px));
 				color: var(--n-400);
 				overflow: hidden;
 				text-overflow: ellipsis;
@@ -253,7 +316,7 @@
 			.agora {
 				flex: none;
 				margin-left: auto;
-				font-size: 32px;
+				font-size: calc(32 * var(--px));
 				font-weight: var(--peso-destaque);
 				color: var(--n-400);
 			}
@@ -304,7 +367,7 @@
 			}
 
 			.dia-controlo .seta {
-				font-size: 48px;
+				font-size: calc(48 * var(--px));
 			}
 
 			/*
@@ -320,13 +383,13 @@
 				flex-direction: column;
 				align-items: center;
 				gap: var(--e-1);
-				min-width: 140px;
+				min-width: calc(140 * var(--px));
 				padding-left: var(--e-6);
 			}
 
 			/* Sem etiqueta, `20:00` ao lado de `23:31` são dois relógios e ninguém sabe qual é qual. */
 			.turno-etiqueta {
-				font-size: 18px;
+				font-size: calc(18 * var(--px));
 				letter-spacing: 0.12em;
 				text-transform: uppercase;
 				color: var(--n-600);
@@ -334,11 +397,11 @@
 			}
 
 			.turno-controlo .seta {
-				font-size: 26px;
+				font-size: calc(26 * var(--px));
 			}
 
 			.turno-hora {
-				font-size: 40px;
+				font-size: calc(40 * var(--px));
 				font-weight: var(--peso-destaque);
 				color: var(--marca-amarelo); /* sobre escuro são 11,7:1 */
 				line-height: 1.1;
@@ -346,14 +409,14 @@
 
 			.turno-pontos {
 				display: flex;
-				gap: 7px;
-				height: 12px;
+				gap: calc(7 * var(--px));
+				height: calc(12 * var(--px));
 				align-items: center;
 			}
 
 			.turno-pontos i {
-				width: 10px;
-				height: 10px;
+				width: calc(10 * var(--px));
+				height: calc(10 * var(--px));
 				border-radius: 50%;
 				background: var(--n-600); /* --n-800 não se via sobre --n-950 */
 			}
@@ -397,12 +460,25 @@
 				 * `min-content` é a largura da linha mais larga que não quebra, portanto o cartão
 				 * nunca fica mais estreito do que o seu conteúdo; o `--largura` é só o tecto.
 				 */
-				grid-template-columns: repeat(var(--colunas, 6), minmax(min-content, var(--largura, 240px)));
+				grid-template-columns: repeat(var(--colunas, 6), minmax(min-content, var(--largura, calc(240 * var(--px)))));
 				justify-content: center;
-				gap: var(--folga, 12px);
+				gap: var(--folga, calc(12 * var(--px)));
 				align-content: start;
 				min-height: 0;
 			}
+
+			/*
+			 * **Cada área qualifica os seus degraus, e não é arrumação.**
+			 *
+			 * Estes blocos eram `.grelha[data-densidade='normal']`, sem a área, e os das recolhas
+			 * ganhavam-lhes só por serem mais específicos. Funcionava enquanto as duas áreas tivessem
+			 * os mesmos quatro degraus. Deixou de funcionar no dia em que as recolhas passaram a ter
+			 * dois: um `data-densidade="apertada"` numa grelha de recolhas apanhava silenciosamente as
+			 * medidas das **entregas**. E qualquer variável que uma área acrescentasse e a outra não
+			 * sobrepusesse — um `--barra`, um `--entre` — atravessava para o lado de lá sem aviso.
+			 *
+			 * Com a área no selector, o que é de uma área fica na área.
+			 */
 
 			/*
 			 * A densidade é escolhida pela contagem, não pelo espaço disponível: com 20 famílias o
@@ -413,43 +489,114 @@
 			 * as pessoas estão sempre lá. Esconder a hora seria o mesmo que paginar: quem está na
 			 * cozinha deixava de ter no ecrã uma coisa de que precisa, e não saberia que faltava.
 			 *
-			 * No degrau mais apertado o secundário desce aos 24px, abaixo do chão de 32px do
+			 * No degrau mais apertado o secundário desce aos 24, abaixo do chão de 32 do
 			 * `design.md`. É uma cedência consciente e está anotada no resumo de decisões: com 90
 			 * famílias num 1080p não cabem as duas coisas, e a alternativa era esconder dados.
+			 *
+			 * ---------------------------------------------------------------------------------
+			 *
+			 * **Três números por degrau, e os três têm de bater certo com a realidade. Há um teste.**
+			 *
+			 * `apps/tv/test/degraus.test.ts` carrega esta página num browser, constrói cartões com
+			 * as funções daqui de baixo e mede-os. Compara três coisas, e cada uma já esteve errada
+			 * aqui sem que nada desse sinal:
+			 *
+			 * 1. **`--largura` ≥ largura mínima do cartão.** O tecto tem de aguentar o cartão que o
+			 *    painel promete mostrar. Abaixo disso a faixa não encolhe — **transborda**, e como a
+			 *    grelha é centrada dentro de um `overflow: hidden`, os cartões saem pelos dois lados
+			 *    ao mesmo tempo, sem nada no ecrã a dizê-lo. O `cheia` esteve com tecto de 180 para
+			 *    um cartão de 186,5.
+			 * 2. **`colunas × --largura` + folgas ≤ largura da grelha** (1 872 do desenho). As
+			 *    recolhas declaravam 5 × 372 = 1 908. Nunca se viu, porque as faixas encolhem até ao
+			 *    conteúdo antes de chegarem ao tecto — mas um tecto inalcançável é um número que
+			 *    mente a quem o ler a seguir.
+			 * 3. **O corte da contagem ≤ lugares que o degrau tem.** É o corte da função
+			 *    `densidade()`, e o `apertada` das entregas apanhava até 72 num degrau de 9 × 7 = 63.
+			 *
+			 * **Por isso é que o cartão tem `--barra` e `--entre`**, e não uma borda e um espaço
+			 * fixos: os últimos seis píxeis que faltavam ao `cheia` para caberem os 90 saíram daí.
+			 * Uma medida deste cartão que viva fora da densidade volta a partir isto.
 			 */
-			.grelha[data-densidade='folgada'] {
+			.grelha[data-area='entregas'][data-densidade='folgada'] {
 				--colunas: 5;
-				--largura: 300px;
-				--numero: 64px;
-				--kg: 42px;
-				--detalhe: 32px;
+				--largura: calc(300 * var(--px));
+				--numero: calc(64 * var(--px));
+				--kg: calc(42 * var(--px));
+				--detalhe: calc(32 * var(--px));
 			}
-			.grelha[data-densidade='normal'] {
+			/*
+			 * **Seis colunas, e não sete, pela mesma razão que o `cheia` tem oito.**
+			 *
+			 * A sete, a coluna tinha 257px para um cartão que no pior caso mede 282 — etiqueta de
+			 * cinco caracteres, peso de três dígitos, contagens de dois. Um núcleo cuja numeração
+			 * passe dos mil serrava a coluna da direita em 40% dos ecrãs, que é a fatia que este
+			 * degrau serve. A seis são 302px, com 20 de margem.
+			 *
+			 * Custa lugares: 6 × 6 = 36, contra os 42 de antes. O corte da `densidade()` acompanhou.
+			 */
+			.grelha[data-area='entregas'][data-densidade='normal'] {
+				--colunas: 6;
+				--largura: calc(302 * var(--px));
+				--barra: calc(10 * var(--px));
+				--entre: calc(6 * var(--px));
+				--numero: calc(52 * var(--px));
+				--kg: calc(32 * var(--px));
+				--detalhe: calc(28 * var(--px));
+				--respiro-h: calc(8 * var(--px));
+			}
+			/*
+			 * **Sete colunas, e não nove.** A nove, a coluna tinha 201px para um cartão de 245 no pior
+			 * caso. A sete são 260, com 16 de margem. Passa de 63 lugares para 49, e o que sobra vai
+			 * para o `cheia`, que tem 72 — mais do que o maior turno da base, que tem 65.
+			 */
+			.grelha[data-area='entregas'][data-densidade='apertada'] {
 				--colunas: 7;
-				--largura: 248px;
-				--numero: 52px;
-				--kg: 32px;
-				--detalhe: 28px;
+				--largura: calc(260 * var(--px));
+				--barra: calc(8 * var(--px));
+				--entre: calc(6 * var(--px));
+				--numero: calc(44 * var(--px));
+				--kg: calc(28 * var(--px));
+				--detalhe: calc(24 * var(--px));
+				--folga: calc(8 * var(--px));
+				--respiro: calc(6 * var(--px));
+				--respiro-h: calc(8 * var(--px));
 			}
-			.grelha[data-densidade='apertada'] {
-				--colunas: 9;
-				--largura: 196px;
-				--numero: 44px;
-				--kg: 28px;
-				--detalhe: 24px;
-				--folga: 10px;
-				--respiro: 6px;
-				--respiro-h: 10px;
-			}
-			.grelha[data-densidade='cheia'] {
-				--colunas: 10;
-				--largura: 180px;
-				--numero: 40px; /* o mínimo absoluto do `design.md` para um televisor */
-				--kg: 24px;
-				--detalhe: 20px; /* abaixo do chão de 32px: ver a nota acima */
-				--folga: 8px;
-				--respiro: 4px;
-				--respiro-h: 8px;
+			/*
+			 * **Oito colunas, e não dez, porque as dez eram para 90 famílias que não existem.**
+			 *
+			 * O 90 que dimensionava este degrau saiu de uma contagem feita **antes** de o painel
+			 * deixar de desenhar fichas arquivadas. Contando as arquivadas, o maior turno da base tem
+			 * 94; contando o que um ecrã mostra, tem **65**. Medido com o
+			 * `scripts/turnos-por-tamanho.ts` em Setembro de 2026: 178 ecrãs, mediana 14, e nenhum
+			 * acima de 65 — 1,1% passam sequer dos 63.
+			 *
+			 * Oito por nove linhas dão 72 lugares, com folga sobre os 65. E dão à coluna **227px em
+			 * vez de 180**, que é o que faz caber um cartão com etiqueta de cinco caracteres (200px)
+			 * e mesmo o pior caso com peso de três dígitos (216px). Com dez, o primeiro núcleo cuja
+			 * numeração passasse dos mil via a coluna da direita serrada ao meio em todas as filas:
+			 * a grelha ia a 2 075px numa faixa de 1 872. Já há 47 cartões assim na base, e o maior
+			 * contador vai em 1574.
+			 *
+			 * Sete colunas dariam 260px, mas só 63 lugares — abaixo dos 65 que existem.
+			 */
+			.grelha[data-area='entregas'][data-densidade='cheia'] {
+				--colunas: 8;
+				--largura: calc(227 * var(--px));
+				/*
+				 * A barra e o espaço interno ficam um pouco abaixo do normal — não pelos 6px que o
+				 * degrau de dez colunas precisava, mas para o **pior caso** caber com margem: etiqueta
+				 * de cinco caracteres, peso de três dígitos e contagens de dois dá um cartão de 224px
+				 * nos 227 que a coluna tem. Sem isto ficava a 0,8px de estourar, e um cartão cortado a
+				 * 3px acende o contador de "fora do ecrã" sem que haja nada de errado.
+				 */
+				--barra: calc(10 * var(--px));
+				--entre: calc(6 * var(--px));
+				--numero: calc(40 * var(--px)); /* o mínimo absoluto do `design.md` para um televisor */
+				--kg: calc(24 * var(--px));
+				--detalhe: calc(20 * var(--px)); /* abaixo do chão de 32px: ver a nota acima */
+				--folga: calc(8 * var(--px));
+				--respiro: calc(4 * var(--px));
+				--respiro-h: calc(8 * var(--px));
 			}
 
 			/* --------------------------------------------------- densidade das recolhas */
@@ -498,51 +645,44 @@
 			 * layout escrita como se fosse regra de estado faz quando o estado cresce.
 			 */
 			.grelha[data-area='recolhas'] .cartao {
-				max-height: var(--altura, 124px);
+				max-height: var(--altura, calc(124 * var(--px)));
 				align-content: start;
 			}
 
 			.grelha[data-area='recolhas'][data-densidade='folgada'] {
 				--colunas: 3;
-				--largura: 600px;
-				--altura: 190px;
-				--nome: 34px;
-				--kg: 42px;
-				--detalhe: 26px;
+				--largura: calc(600 * var(--px));
+				--altura: calc(190 * var(--px));
+				--nome: calc(34 * var(--px));
+				--kg: calc(42 * var(--px));
+				--detalhe: calc(26 * var(--px));
 			}
 			.grelha[data-area='recolhas'][data-densidade='normal'] {
 				--colunas: 5;
-				--largura: 372px;
-				--altura: 124px; /* 30 fontes ÷ 5 = 6 linhas */
-				--nome: 26px;
-				--kg: 32px;
-				--detalhe: 21px;
+				--largura: calc(364 * var(--px));
+				--altura: calc(124 * var(--px)); /* 30 fontes ÷ 5 = 6 linhas */
+				--nome: calc(26 * var(--px));
+				--kg: calc(32 * var(--px));
+				--detalhe: calc(21 * var(--px));
 			}
 			/*
-			 * A altura de cada degrau sai da conta, não do gosto: com a área da grelha em 804px,
-			 * `altura = (804 - (linhas-1) × folga) / linhas`, e as linhas são o tecto do degrau a
-			 * dividir pelas colunas. Um número a mais aqui é uma fila de fontes fora do ecrã.
+			 * **As recolhas têm dois degraus, e não quatro. Os outros dois nunca aconteceram.**
+			 *
+			 * Havia aqui um `apertada` (6 colunas, até 42 fontes) e um `cheia` (7 colunas, até 70).
+			 * Medido sobre a base com o `scripts/turnos-por-tamanho.ts`, em Setembro de 2026: 154
+			 * ecrãs de recolhas, **máximo de 26 fontes**, 94% deles com 12 ou menos. **Zero ecrãs
+			 * chegavam ao `apertada`**, quanto mais ao `cheia`.
+			 *
+			 * Eram dois blocos de medidas que nunca foram desenhados num televisor, nunca foram
+			 * vistos por ninguém, e à mesma tinham de ser mantidos a par do resto — o `cheia` das
+			 * recolhas declarava um tecto que não cabia na largura da grelha, e ninguém deu por isso
+			 * em meses, porque não havia como dar. Código que nunca corre é código que ninguém testa.
+			 *
+			 * O `normal` passou a não ter tecto de contagem: apanha tudo o que passe de 12. Tem 5 × 6
+			 * = 30 lugares para um máximo observado de 26, e **é o aviso de "fora do ecrã" que guarda
+			 * essa folga** — ver o `contarForaDoEcra()`. Se um núcleo crescer, aparece no cabeçalho em
+			 * vez de desaparecer em silêncio.
 			 */
-			.grelha[data-area='recolhas'][data-densidade='apertada'] {
-				--colunas: 6;
-				--largura: 306px;
-				--altura: 106px; /* 42 fontes ÷ 6 = 7 linhas */
-				--nome: 22px;
-				--kg: 28px;
-				--detalhe: 18px;
-				--folga: 10px;
-				--respiro: 6px;
-			}
-			.grelha[data-area='recolhas'][data-densidade='cheia'] {
-				--colunas: 7;
-				--largura: 260px;
-				--altura: 73px; /* até 70 fontes ÷ 7 = 10 linhas */
-				--nome: 19px;
-				--kg: 24px;
-				--detalhe: 16px;
-				--folga: 8px;
-				--respiro: 2px;
-			}
 
 			/* ---------------------------------------------------------------- cartões */
 
@@ -561,14 +701,25 @@
 				--fundo: transparent;
 
 				background: var(--fundo);
-				border: 3px solid var(--cor);
-				border-left-width: 12px; /* a barra grossa lê-se de longe mesmo sem se distinguir a cor */
-				border-radius: 8px;
-				padding: var(--respiro, 8px) var(--respiro-h, 12px);
+				border: calc(3 * var(--px)) solid var(--cor);
+				/*
+				 * A barra grossa lê-se de longe mesmo sem se distinguir a cor — e **encolhe com o
+				 * degrau**, como todo o resto do cartão. Fixa nos 12, era 6,7% da largura de um
+				 * cartão do degrau `cheia` gasta em moldura, num degrau onde faltavam 6px para os
+				 * cartões caberem no ecrã. Ver a nota dos tectos, na densidade.
+				 */
+				border-left-width: var(--barra, calc(12 * var(--px)));
+				border-radius: calc(8 * var(--px));
+				padding: var(--respiro, calc(8 * var(--px))) var(--respiro-h, calc(12 * var(--px)));
 				display: grid;
 				grid-template-columns: 1fr auto;
 				align-items: center;
-				gap: var(--e-1) var(--e-2);
+				/*
+				 * O `--entre` é a distância do identificador aos quilos, e é a terceira medida que
+				 * vivia fora da densidade: `var(--e-2)` são 8px tanto ao lado de um número de 64px
+				 * como de um de 40px.
+				 */
+				gap: var(--e-1) var(--entre, var(--e-2));
 				/*
 				 * Sem `overflow: hidden` e **sem `min-width: 0`**. Os dois cortam texto em silêncio,
 				 * e o segundo era o que anulava o `min-content` da grelha: com ele, o cartão podia
@@ -637,7 +788,7 @@
 			/* Fica na coluna 1, com a marca de estado ao lado — não em cima dela, que gastava uma linha. */
 			.identificador {
 				grid-column: 1;
-				font-size: var(--nome, 26px);
+				font-size: var(--nome, calc(26 * var(--px)));
 				line-height: 1.15;
 				overflow-wrap: break-word;
 				align-self: start;
@@ -661,17 +812,17 @@
 			 * apareceu — vale mais um nome pequeno do que um nome cortado.
 			 */
 			.identificador[data-longo='1'] {
-				font-size: calc(var(--nome, 26px) * 0.88);
+				font-size: calc(var(--nome, calc(26 * var(--px))) * 0.88);
 			}
 			.identificador[data-longo='2'] {
-				font-size: calc(var(--nome, 26px) * 0.78);
+				font-size: calc(var(--nome, calc(26 * var(--px))) * 0.78);
 			}
 			.identificador[data-longo='3'] {
-				font-size: calc(var(--nome, 26px) * 0.68);
+				font-size: calc(var(--nome, calc(26 * var(--px))) * 0.68);
 			}
 
 			.numero {
-				font-size: var(--numero, 64px);
+				font-size: var(--numero, calc(64 * var(--px)));
 				font-weight: var(--peso-destaque);
 				line-height: 1;
 				white-space: nowrap;
@@ -683,7 +834,7 @@
 			}
 
 			.marca {
-				font-size: var(--numero, 64px);
+				font-size: var(--numero, calc(64 * var(--px)));
 				line-height: 1;
 				color: var(--cor);
 			}
@@ -726,7 +877,7 @@
 			 * deixa é de competir com o identificador, que é quem manda na coluna 1.
 			 */
 			.peso {
-				font-size: var(--kg, 32px);
+				font-size: var(--kg, calc(32 * var(--px)));
 				font-weight: var(--peso-destaque);
 				line-height: 1;
 				color: var(--cor);
@@ -754,12 +905,24 @@
 				margin-left: 0.15em;
 			}
 
+			/*
+			 * **O espaço entre a hora e as pessoas é proporcional à letra, e não um token fixo.**
+			 *
+			 * Era `var(--e-4)` — 16px em todos os degraus. Num cartão folgado, ao lado de letra de
+			 * 32px, é a folga certa; no degrau `cheia`, ao lado de letra de 20px, são 80% do corpo,
+			 * e essa linha é **a que decide a largura mínima do cartão inteiro**, porque não quebra.
+			 * Custava 8px de `min-content` no degrau onde não há 8px para dar.
+			 *
+			 * É o mesmo defeito que os tectos dos degraus tinham, na sua terceira aparição: uma
+			 * medida a viver fora do sistema de densidade, a crescer contra um limite que ninguém
+			 * verificava. Agora acompanha o corpo da letra, como tudo o resto no cartão.
+			 */
 			.detalhe {
 				grid-column: 1 / -1;
-				font-size: var(--detalhe, 32px);
+				font-size: var(--detalhe, calc(32 * var(--px)));
 				color: var(--n-400);
 				display: flex;
-				gap: var(--e-4);
+				gap: 0.4em;
 				white-space: nowrap;
 			}
 
@@ -816,8 +979,8 @@
 			 * ser sempre a mesma — e é escrita pelo JavaScript numa variável, não fixada aqui.
 			 */
 			.rodape {
-				border-top: 2px solid var(--n-800);
-				height: 48px;
+				border-top: calc(2 * var(--px)) solid var(--n-800);
+				height: calc(48 * var(--px));
 				display: flex;
 				align-items: center;
 				gap: var(--e-8);
@@ -841,8 +1004,8 @@
 				align-items: center;
 				gap: var(--e-6);
 				padding-right: var(--e-8);
-				border-right: 2px solid var(--n-800);
-				font-size: 22px;
+				border-right: calc(2 * var(--px)) solid var(--n-800);
+				font-size: calc(22 * var(--px));
 				color: var(--n-600);
 				white-space: nowrap;
 				user-select: none;
@@ -858,9 +1021,9 @@
 			.comando i {
 				font-style: normal;
 				color: var(--n-400);
-				border: 1px solid var(--n-800);
-				border-radius: 4px;
-				padding: 1px 8px;
+				border: calc(1 * var(--px)) solid var(--n-800);
+				border-radius: calc(4 * var(--px));
+				padding: calc(1 * var(--px)) calc(8 * var(--px));
 			}
 
 			/* O que ainda não existe diz que ainda não existe, em vez de abrir um ecrã vazio. */
@@ -872,7 +1035,7 @@
 			/* Entre parênteses, para não se ler como a continuação da frase nem como uma nota. */
 			.por-vir em {
 				font-style: normal;
-				font-size: 18px;
+				font-size: calc(18 * var(--px));
 			}
 
 			.por-vir em::before {
@@ -885,12 +1048,12 @@
 
 			.rodape-etiqueta {
 				flex: none;
-				font-size: 24px;
+				font-size: calc(24 * var(--px));
 				font-weight: var(--peso-enfase);
 				color: var(--marca-preto);
 				background: var(--marca-amarelo); /* sobre amarelo o texto é preto, nunca branco */
 				padding: var(--e-1) var(--e-3);
-				border-radius: 4px;
+				border-radius: calc(4 * var(--px));
 				text-transform: uppercase;
 				letter-spacing: 0.08em;
 			}
@@ -913,7 +1076,7 @@
 				display: flex;
 				width: max-content;
 				gap: var(--e-16);
-				font-size: 28px;
+				font-size: calc(28 * var(--px));
 				white-space: nowrap;
 				animation: rolar var(--duracao, 40s) linear infinite;
 			}
@@ -945,13 +1108,13 @@
 			/* ------------------------------------------------------------------ avisos */
 
 			.aviso {
-				font-size: 40px;
+				font-size: calc(40 * var(--px));
 				color: var(--erro-claro);
 				padding: var(--e-6) 0;
 			}
 
 			.vazio {
-				font-size: 40px;
+				font-size: calc(40 * var(--px));
 				color: var(--n-400);
 				padding: var(--e-12) 0;
 			}
@@ -991,12 +1154,13 @@
 				<span class="peso-total" id="peso-total-grupo" hidden><b id="peso-total">0</b></span>
 				<span class="fora-de-escala" id="fora-de-escala-grupo" hidden><b id="fora-de-escala">0</b> fora de escala</span>
 				<span class="por-identificar" id="por-identificar-grupo" hidden><b id="por-identificar">0</b> por identificar</span>
+				<span class="fora-do-ecra" id="fora-do-ecra-grupo" hidden><b id="fora-do-ecra">0</b> fora do ecrã</span>
 			</div>
 		</header>
 
 		<div class="corpo">
 			<div>
-				<div class="grelha" id="grelha" data-densidade="normal"></div>
+				<div class="grelha" id="grelha" data-area="entregas" data-densidade="normal"></div>
 				<p class="vazio" id="vazio" hidden>Sem entregas neste turno.</p>
 				<p class="aviso" id="aviso" role="status" aria-live="polite" hidden></p>
 			</div>
@@ -1111,12 +1275,37 @@
 				return i;
 			}
 
+			/*
+			 * **Cada corte é o número de lugares que o degrau tem, e não um número redondo.**
+			 *
+			 * Dizia 42 num `normal` de 36 lugares e 72 num `apertada` de 63, e um turno dessa dimensão
+			 * caía ali e mostrava menos, com os que sobravam a não existir e nada no ecrã a dizê-lo.
+			 * Hoje cada corte é o número de lugares: 15, 36, 49, e o resto no `cheia`, que tem 72.
+			 *
+			 * **As duas áreas não têm o mesmo número de degraus, e é medido.** As recolhas têm dois:
+			 * nunca houve um ecrã com mais de 26 fontes, e os dois degraus densos que aqui existiam
+			 * nunca foram desenhados. Ver a nota no CSS das recolhas.
+			 *
+			 * Mexer num tamanho lá em cima muda quantas linhas cabem, e portanto muda estes números.
+			 * O `degraus.test.ts` compara os dois lados; não se acerta um sem o outro.
+			 */
+			const DENSIDADES = {
+				entregas: [
+					[15, 'folgada'],
+					[36, 'normal'],
+					[49, 'apertada'],
+					[Infinity, 'cheia'],
+				],
+				recolhas: [
+					[12, 'folgada'],
+					[Infinity, 'normal'],
+				],
+			};
+
 			function densidade(quantos, area) {
-				const cortes = area === 'recolhas' ? [12, 30, 42] : [15, 42, 72];
-				if (quantos <= cortes[0]) return 'folgada';
-				if (quantos <= cortes[1]) return 'normal';
-				if (quantos <= cortes[2]) return 'apertada';
-				return 'cheia';
+				for (const [ate, nome] of DENSIDADES[area]) if (quantos <= ate) return nome;
+				// Inalcançável: o último corte é Infinity. Se lá chegar, alguém tirou-o.
+				return 'folgada';
 			}
 
 			/**
@@ -1348,6 +1537,77 @@
 				}
 
 				el('vazio').hidden = painel.cartoes.length > 0;
+
+				/*
+				 * **Conta-se sempre, e conta-se aqui.** É o único sítio por onde todos os desenhos da
+				 * grelha passam — mudar de dia, de turno, de área, ou a leitura dos 60 segundos. Num
+				 * sítio mais acima, o próximo caminho novo esquecia-se dele, que é como este género de
+				 * verificação morre.
+				 */
+				mostrarForaDoEcra(painel.cartoes.length);
+			}
+
+			/** Um píxel de tolerância, para o arredondamento do traçado não contar como cartão perdido. */
+			const MARGEM_DO_ECRA = 1;
+
+			/**
+			 * Quantos cartões é que o painel desenhou e o ecrã não está a mostrar.
+			 *
+			 * **Compara-se o que se desenhou com o que se vê, e não com uma conta.** Uma conta é
+			 * exactamente o que já esteve errado — as colunas e as linhas de cada degrau eram números
+			 * escritos à mão contra um máximo de famílias que deixou de valer. Aqui pergunta-se ao
+			 * browser onde é que cada cartão ficou, depois de ele ter feito as contas dele.
+			 *
+			 * **Os limites são a banda entre o cabeçalho e o rodapé, não a janela.** Um cartão pode
+			 * estar dentro da janela e por baixo do rodapé: quando a grelha fica mais alta do que a
+			 * faixa que tem, é isso que acontece à última fila, e do sofá lê-se como um cartão cortado
+			 * ao meio por uma linha cinzenta. Conta como não estar no ecrã, porque não está.
+			 *
+			 * O rodapé tem altura fixa, por isso este limite não depende de haver notas ou não.
+			 */
+			function contarForaDoEcra() {
+				const cartoes = el('grelha').children;
+				if (cartoes.length === 0) return 0;
+
+				const topo = document.querySelector('header').getBoundingClientRect().bottom;
+				const fundo = document.querySelector('.rodape').getBoundingClientRect().top;
+				const largura = window.innerWidth;
+
+				let fora = 0;
+				for (const cartao of cartoes) {
+					const caixa = cartao.getBoundingClientRect();
+					const dentro =
+						caixa.left >= -MARGEM_DO_ECRA &&
+						caixa.right <= largura + MARGEM_DO_ECRA &&
+						caixa.top >= topo - MARGEM_DO_ECRA &&
+						caixa.bottom <= fundo + MARGEM_DO_ECRA;
+					if (!dentro) fora++;
+				}
+				return fora;
+			}
+
+			/**
+			 * Põe o número no cabeçalho, ao lado dos outros que dizem o que não está à vista.
+			 *
+			 * Escondido quando é zero, que é o caso normal e o que se espera para sempre. Quando não
+			 * é, fica vermelho: ao contrário do `fora de escala`, que é uma estranheza do Odoo, isto é
+			 * a app a falhar no que lhe compete.
+			 */
+			function mostrarForaDoEcra(quantosVieram) {
+				const fora = contarForaDoEcra();
+
+				el('fora-do-ecra-grupo').hidden = fora === 0;
+				el('fora-do-ecra').textContent = fora;
+
+				/*
+				 * E fica registado, porque um televisor numa cozinha não tem ninguém a olhar para a
+				 * consola — mas quando alguém for lá ver porque é que faltam famílias, a linha está lá.
+				 */
+				if (fora > 0) {
+					console.warn(
+						`[painel] ${fora} de ${quantosVieram} cartões ficaram fora do ecrã (área ${area}, densidade ${el('grelha').dataset.densidade}).`,
+					);
+				}
 			}
 
 			function desenharCabecalho(painel) {
