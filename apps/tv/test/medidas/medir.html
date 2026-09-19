@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="pt-PT">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Medida dos degraus do painel</title>
+	</head>
+	<body>
+		<script>
+			/*
+			 * **Banco de medida dos degraus do painel — e não uma réplica dele.**
+			 *
+			 * Isto existe porque a única forma de saber a largura mínima de um cartão é pô-lo num
+			 * browser e perguntar. Não há conta que a dê: depende das métricas da Inter, do
+			 * `min-content` de uma grelha de duas colunas, e de um `white-space: nowrap` numa linha
+			 * de baixo. Uma versão anterior disto foi escrita à mão, a copiar o CSS do painel para
+			 * aqui, e mediu um cartão que não existe — por isso **esta página não copia nada**:
+			 *
+			 * 1. vai buscar o `painel.html` ao servidor;
+			 * 2. injecta o `<style>` **dele** e o `<body>` **dele** nesta página;
+			 * 3. injecta o `<script>` **dele**, que define `cartaoDeEntrega`, `cartaoDeRecolha` e
+			 *    `densidade` como funções globais;
+			 * 4. constrói os cartões chamando essas funções, exactamente como o `desenharGrelha` faz.
+			 *
+			 * O que se mede é o painel. Se o painel mudar, isto mede o painel novo — que é a diferença
+			 * entre um teste que protege e um teste que confirma uma cópia velha.
+			 *
+			 * Os resultados saem em JSON dentro de `<pre id="resultado">`, que é o que o
+			 * `degraus.test.ts` lê do `--dump-dom` do Chrome.
+			 */
+
+			/*
+			 * **Os cartões de medida são o pior caso realista, não um exemplo simpático.**
+			 *
+			 * O tecto de um degrau tem de aguentar o cartão mais largo que o painel consegue
+			 * desenhar, porque é esse que decide a largura da coluna toda — a grelha dimensiona cada
+			 * faixa pelo maior `min-content` que lá caia. Medir com o cartão médio dá um tecto que
+			 * passa nos testes e corta no turno cheio.
+			 *
+			 * Daí cada um destes:
+			 *
+			 * - **`peso-largo`** — três dígitos de quilos. É o cartão com mais tinta na coluna da
+			 *   direita, e o `12A 10C` é a linha de baixo mais comprida que a decomposição permite.
+			 * - **`sem-peso`** — sem quilos o painel põe lá o glifo do estado, e **o glifo tem o
+			 *   tamanho do número** (`font-size: var(--numero)`), não o dos quilos. É maior do que
+			 *   parece e é fácil de esquecer: 1,2% dos cartões da base não têm peso.
+			 * - **`sem-contagem`** — o travessão, que é o caso curto, para se ver a folga que há.
+			 * - Nas recolhas, **o nome mais comprido da base**, 55 caracteres, que é o que o
+			 *   comentário do `painel.html` diz que manda na largura da coluna.
+			 */
+			/** Um cartão de entrega, com o resto do contrato preenchido por omissão. */
+			function entrega(chave, campos) {
+				return Object.assign(
+					{
+						chave,
+						etiqueta: 'B912',
+						nome: null,
+						adultos: 3,
+						criancas: 4,
+						pessoas: null,
+						hora: '19:30',
+						peso: '15 kg',
+						estado: 'entregue',
+						extra: false,
+					},
+					campos,
+				);
+			}
+
+			/** Um cartão de recolha. O nome é o mais comprido da base — 55 caracteres. */
+			function recolha(chave, campos) {
+				return Object.assign(
+					{
+						chave,
+						etiqueta: 'F118',
+						nome: 'Supermercado Continente - Bom Dia - Gândara dos Olivais',
+						adultos: null,
+						criancas: null,
+						pessoas: null,
+						hora: '19:30',
+						peso: '15 kg',
+						estado: 'recolhido',
+						extra: false,
+					},
+					campos,
+				);
+			}
+
+			const AMOSTRAS = {
+				entregas: [
+					/* A base documentada no `painel.html`: número de 4 caracteres, linha de baixo de 11. */
+					entrega('documentado', {}),
+					/*
+					 * **Cinco caracteres na etiqueta, e não é um caso de laboratório.** O `number` da
+					 * ficha é `sequence_prefix` + contador a **seis dígitos**, e a `etiquetaDoNumero`
+					 * só lhe tira os zeros da frente: `PTABF_BF001047` dá `B1047`. Com 11 297 fichas
+					 * na base, um contador de quatro dígitos num núcleo não é raro — é o normal daqui
+					 * a pouco. O `B912` do comentário é uma suposição, não um limite.
+					 */
+					entrega('etiqueta-5', { etiqueta: 'B1047' }),
+					/* O tecto de peso de uma entrega é 300 kg: três dígitos é o máximo, e é corrente. */
+					entrega('peso-3-digitos', { peso: '300 kg' }),
+					/* Sem peso, o lugar é do glifo do estado — que tem o tamanho do **número**, não o dos quilos. */
+					entrega('sem-peso', { peso: null, estado: 'por_entregar' }),
+					/* Sem decomposição: o travessão. É o cartão curto, e serve para se ver a folga que há. */
+					entrega('sem-contagem', { adultos: null, criancas: null }),
+					/* Tudo ao mesmo tempo, que é o que uma coluna da grelha tem de aguentar. */
+					entrega('pior-caso', { etiqueta: 'B1047', peso: '300 kg', adultos: 12, criancas: 10 }),
+				],
+				recolhas: [
+					recolha('documentado', {}),
+					/* O tecto de peso de uma recolha é 1 500 kg — quatro dígitos —, e acima disso vem em toneladas. */
+					recolha('peso-4-digitos', { peso: '1500 kg' }),
+					recolha('sem-peso', { peso: null, estado: 'por_recolher' }),
+					/* Uma fonte sem nome não existe, mas uma com nome curto mostra a folga do degrau. */
+					recolha('nome-curto', { nome: 'Pingo Doce' }),
+					recolha('pior-caso', { etiqueta: 'F1047', peso: '1500 kg' }),
+				],
+			};
+
+			/**
+			 * Um número sem unidade guardado numa variável CSS — o `--colunas`.
+			 *
+			 * Aqui o token cru serve, porque não há nada para resolver.
+			 */
+			function numeroDaVariavel(estilo, nome) {
+				const n = Number.parseFloat(estilo.getPropertyValue(nome).trim());
+				return Number.isFinite(n) ? n : null;
+			}
+
+			/**
+			 * Uma **distância** guardada numa variável CSS, em píxeis resolvidos.
+			 *
+			 * **Não se lê a variável: dá-se-lhe uso e pergunta-se o resultado.** Uma propriedade
+			 * personalizada não registada guarda o texto tal e qual, e `getPropertyValue('--largura')`
+			 * devolve hoje `calc(180 * var(--px))` — que o `parseFloat` lê como `NaN`, ou pior, como
+			 * `180` se alguém lhe tirar o `calc`. O valor verdadeiro depende do `--px` e portanto da
+			 * janela: são 180px a 1920 e 90px a 960.
+			 *
+			 * Então põe-se a variável numa `width` de um elemento de prova e lê-se a `width`
+			 * calculada, que o browser já resolveu. `null` quando a variável não existe — é assim que
+			 * se distingue o `--altura` das recolhas, que existe, do das entregas, que não.
+			 */
+			function distanciaDaVariavel(prova, estiloDaProva, nome) {
+				prova.style.width = 'var(' + nome + ')';
+				const largura = estiloDaProva.width;
+				prova.style.width = '';
+				const n = Number.parseFloat(largura);
+				return Number.isFinite(n) ? n : null;
+			}
+
+			/**
+			 * Que degraus é que esta área tem, e até onde vai cada um — **perguntado à função do
+			 * painel**, nunca copiado.
+			 *
+			 * Sonda-se a `densidade()` de 1 até 400 e regista-se o que ela responde. Daqui sai a lista
+			 * dos degraus por ordem e o tecto de contagem de cada um, sem esta página saber quantos
+			 * são nem como se chamam.
+			 *
+			 * **E não saber é o ponto.** Isto teve uma lista de quatro nomes escrita à mão, e no dia
+			 * em que as recolhas passaram a ter dois degraus ela continuou a pedir os outros dois: um
+			 * `data-densidade="apertada"` numa grelha de recolhas não deixa de ter estilo nenhum —
+			 * apanha o das **entregas**, porque esses selectores não são qualificados por área. A
+			 * página media então um cartão de recolha com as medidas de um cartão de entrega e
+			 * queixava-se de um tecto que ninguém tinha escrito.
+			 *
+			 * O último degrau não tem tecto — é para onde vai tudo o que passa do penúltimo — e
+			 * responde `null`, para o teste saber que ali o limite não está no painel, está nos dados.
+			 */
+			const SONDA_MAXIMA = 400;
+
+			function degrausDaArea(area) {
+				const ate = new Map();
+				for (let n = 1; n <= SONDA_MAXIMA; n++) ate.set(densidade(n, area), n);
+				return [...ate].map(([nome, ultimo]) => ({ nome, ate: ultimo === SONDA_MAXIMA ? null : ultimo }));
+			}
+
+			/** Um cartão igual ao que o `desenharGrelha` põe na grelha — mesmo `div`, mesmos filhos. */
+			function cartaoReal(area, dados) {
+				const div = document.createElement('div');
+				div.className = 'cartao';
+				div.dataset.estado = dados.estado;
+				if (dados.extra) div.dataset.extra = 'sim';
+				div.append(...(area === 'recolhas' ? cartaoDeRecolha(dados) : cartaoDeEntrega(dados)));
+				return div;
+			}
+
+			function medir() {
+				/*
+				 * A largura que a grelha tem mesmo, lida da página real e não calculada. É o `1fr` do
+				 * corpo, já descontadas as margens do `body` — os 1872px de um 1080p.
+				 */
+				const grelhaReal = document.getElementById('grelha');
+				const disponivel = grelhaReal.getBoundingClientRect().width;
+				const alturaDisponivel = grelhaReal.parentElement.getBoundingClientRect().height;
+
+				/*
+				 * A bancada: uma `.grelha` a sério, para as variáveis do degrau virem do CSS do
+				 * painel por herança, mas fora do fluxo e em `block`, para que a largura de cada
+				 * cartão seja a do cartão e não a da faixa da grelha.
+				 */
+				const bancada = document.createElement('div');
+				bancada.className = 'grelha';
+				bancada.style.cssText = 'display:block; position:absolute; left:-10000px; top:0; width:max-content; visibility:hidden';
+				document.body.append(bancada);
+
+				/* O elemento de prova, para resolver as variáveis de distância. Vive dentro da bancada, para as herdar. */
+				const prova = document.createElement('div');
+				prova.style.cssText = 'position:absolute; height:0';
+				bancada.append(prova);
+				const estiloDaProva = getComputedStyle(prova);
+
+				const degraus = [];
+
+				for (const area of ['entregas', 'recolhas']) {
+					bancada.dataset.area = area;
+
+					for (const { nome, ate } of degrausDaArea(area)) {
+						bancada.dataset.densidade = nome;
+						const estilo = getComputedStyle(bancada);
+
+						/*
+						 * **A folga lê-se do `column-gap` resolvido, não da variável.** A grelha
+						 * escreve `gap: var(--folga, 12px)`, e os dois degraus mais largos não
+						 * definem `--folga` nenhum — vivem do valor por omissão. Perguntar pela
+						 * variável devolvia vazio nesses dois, e uma conta com `undefined` lá dentro
+						 * não falha: dá `NaN` e passa despercebida. Que é, ponto por ponto, o mesmo
+						 * defeito que esta página existe para apanhar.
+						 */
+						const folga = Number.parseFloat(estilo.columnGap) || 0;
+
+						const tecto = distanciaDaVariavel(prova, estiloDaProva, '--largura');
+
+						const medidas = [];
+						for (const dados of AMOSTRAS[area]) {
+							const cartao = cartaoReal(area, dados);
+							bancada.append(cartao);
+
+							cartao.style.width = 'min-content';
+							const minimo = cartao.getBoundingClientRect().width;
+
+							/* A altura à largura do tecto, que é como o cartão fica quando há espaço. */
+							cartao.style.width = tecto + 'px';
+							const altura = cartao.getBoundingClientRect().height;
+
+							cartao.remove();
+							medidas.push({ chave: dados.chave, minimo: minimo, altura: altura });
+						}
+
+						const pior = medidas.reduce((a, b) => (b.minimo > a.minimo ? b : a));
+
+						degraus.push({
+							area: area,
+							densidade: nome,
+							ate: ate,
+							colunas: numeroDaVariavel(estilo, '--colunas'),
+							tecto: tecto,
+							folga: folga,
+							/* Só as recolhas têm tecto de altura; nas entregas a linha é do conteúdo. */
+							tectoDeAltura: distanciaDaVariavel(prova, estiloDaProva, '--altura'),
+							minimo: pior.minimo,
+							minimoDe: pior.chave,
+							altura: Math.max(...medidas.map((m) => m.altura)),
+							medidas: medidas,
+						});
+					}
+				}
+
+				bancada.remove();
+
+				/*
+				 * **A prova do aviso, e não só das medidas.**
+				 *
+				 * O contador de "fora do ecrã" é a rede que apanha o dia em que estes números voltarem
+				 * a ficar velhos. Uma rede que deixe de funcionar em silêncio é o mesmo defeito outra
+				 * vez, uma camada acima — por isso põe-se o painel a desenhar mais cartões do que o
+				 * degrau comporta e pergunta-se-lhe se dá por isso.
+				 */
+				const maisDenso = degraus.filter((d) => d.area === 'entregas').at(-1);
+				const linhasQueCabem = Math.floor((alturaDisponivel + maisDenso.folga) / (maisDenso.altura + maisDenso.folga));
+				const lugares = maisDenso.colunas * linhasQueCabem;
+
+				const aviso = [lugares, lugares + 12].map((quantos) => provaDoAviso(quantos));
+
+				return {
+					lugares: lugares,
+					aviso: aviso,
+					janela: { largura: window.innerWidth, altura: window.innerHeight, dpr: window.devicePixelRatio },
+					disponivel: disponivel,
+					alturaDisponivel: alturaDisponivel,
+					degraus: degraus,
+				};
+			}
+
+			/**
+			 * Manda o painel desenhar `quantos` cartões e devolve o que o contador do cabeçalho diz.
+			 *
+			 * Passa pelo `desenharGrelha` verdadeiro — o mesmo caminho de uma leitura do servidor —
+			 * para que o contador seja exercido por onde é chamado a sério, e não por uma chamada
+			 * directa que continuaria a passar se alguém o tirasse de lá.
+			 */
+			function provaDoAviso(quantos) {
+				const cartoes = Array.from({ length: quantos }, (_, i) => ({
+					etiqueta: 'B' + (100 + (i % 900)),
+					nome: null,
+					adultos: 3,
+					criancas: 4,
+					pessoas: null,
+					hora: '19:30',
+					peso: '15 kg',
+					estado: 'entregue',
+					extra: false,
+				}));
+
+				desenharGrelha({ cartoes });
+
+				return {
+					pedidos: quantos,
+					contador: Number.parseInt(document.getElementById('fora-do-ecra').textContent, 10),
+					escondido: document.getElementById('fora-do-ecra-grupo').hidden,
+				};
+			}
+
+			async function principal() {
+				/* O `painel.html` vem primeiro, porque o `fetch` é travado logo a seguir. */
+				const html = await fetch('/painel.html').then((r) => r.text());
+
+				/*
+				 * **Duas travas contra a mesma coisa: o painel navegar para fora a meio da medição.**
+				 *
+				 * O painel arranca sozinho — `carregar()` na última linha — e manda o televisor para
+				 * a página de emparelhamento com `location.href = '/'` assim que uma leitura responde
+				 * `sem_token`. E responde antes de haver rede nenhuma: sem token guardado, o `pedir`
+				 * nem chega a pedir.
+				 *
+				 * Então **semeia-se um token** — a chave é a do painel, o valor não interessa porque
+				 * ninguém do outro lado o vai verificar — e **prende-se o `fetch`** numa promessa que
+				 * nunca resolve, para o pedido que se segue também não ter como voltar com uma
+				 * resposta que faça o painel decidir seja o que for. As funções e o CSS já cá estão;
+				 * a partir daqui o painel não tem mais nada a fazer.
+				 */
+				localStorage.setItem('refood.tv.token', 'medida');
+				window.fetch = () => new Promise(() => {});
+
+				const painel = new DOMParser().parseFromString(html, 'text/html');
+
+				/*
+				 * **Esperar por cada folha externa, uma a uma.** O `tokens.css` traz os `--e-*` e o
+				 * `@font-face`, e sem ele o `padding: var(--e-6)` do painel resolve para nada: mede-se
+				 * uma página sem margens e sem Inter, e os números saem todos errados sem nada a
+				 * dizê-lo. Não chega o `document.fonts.ready` — esse resolve de imediato enquanto não
+				 * houver uma fonte sequer pendente, que é precisamente o estado antes de a folha
+				 * chegar. Por isso se espera pelo `load` de cada `<link>` primeiro.
+				 */
+				const folhas = [];
+				for (const original of painel.querySelectorAll('link[rel="stylesheet"]')) {
+					const folha = document.createElement('link');
+					folha.rel = 'stylesheet';
+					folha.href = original.getAttribute('href');
+					folhas.push(new Promise((ok, falha) => (folha.onload = ok) && (folha.onerror = () => falha(new Error('falhou ' + folha.href)))));
+					document.head.append(folha);
+				}
+				await Promise.all(folhas);
+
+				/* Elemento novo com o texto do original: um `<style>` clonado de um documento inerte nem sempre reactiva. */
+				for (const original of painel.querySelectorAll('style')) {
+					const estilo = document.createElement('style');
+					estilo.textContent = original.textContent;
+					document.head.append(estilo);
+				}
+
+				/* `innerHTML` não executa `<script>`; o do painel é injectado a seguir, à mão. */
+				document.body.innerHTML = painel.body.innerHTML;
+
+				const codigo = document.createElement('script');
+				codigo.textContent = painel.querySelector('script').textContent;
+				document.body.append(codigo);
+
+				/* A Inter tem de estar carregada: as medidas são larguras de texto. */
+				await document.fonts.load('500 20px Inter');
+				await document.fonts.load('700 40px Inter');
+				await document.fonts.ready;
+
+				let resultado;
+				try {
+					resultado = medir();
+					/*
+					 * **A prova de que a montagem pegou.** Sem isto, uma folha que não chegou dá
+					 * números plausíveis e errados — foi o primeiro defeito desta página. O teste
+					 * recusa um resultado em que qualquer destes não bata certo.
+					 */
+					resultado.montagem = {
+						folhas: document.styleSheets.length,
+						margemDoCorpo: getComputedStyle(document.body).paddingTop,
+						inter: document.fonts.check('500 20px Inter'),
+						temGrelha: Boolean(document.getElementById('grelha')),
+						temConstrutores:
+							typeof cartaoDeEntrega === 'function' && typeof cartaoDeRecolha === 'function' && typeof densidade === 'function',
+					};
+				} catch (erro) {
+					resultado = { erro: String((erro && erro.stack) || erro) };
+				}
+
+				const pre = document.createElement('pre');
+				pre.id = 'resultado';
+				pre.textContent = JSON.stringify(resultado);
+				document.body.append(pre);
+			}
+
+			principal();
+		</script>
+	</body>
+</html>
